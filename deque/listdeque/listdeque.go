@@ -52,7 +52,7 @@ func (d *ListDeque[T]) String() string {
 	if d == nil {
 		return "nil"
 	}
-	if d.Len() == 0 {
+	if d.l.Len() == 0 {
 		return "ListDeque[]"
 	}
 	var sb strings.Builder
@@ -75,7 +75,7 @@ func (d *ListDeque[T]) GoString() string {
         return "nil"
     }
 	var zero T
-    if d.Len() == 0 {
+    if d.l.Len() == 0 {
         return fmt.Sprintf("ListDeque[%T]{}", zero)
     }
     var sb strings.Builder
@@ -108,7 +108,7 @@ func (d *ListDeque[T]) PushBack(v T) {
 }
 
 // PopBack removes and returns the item at the back end of the deque.
-func (d *ListDeque[T]) PopBack(v T) (T, bool) {
+func (d *ListDeque[T]) PopBack() (T, bool) {
 	return d.l.PopBack()
 }
 
@@ -123,7 +123,7 @@ func (d *ListDeque[T]) PushFront(v T) {
 }
 
 // PopFront removes and returns the item at the front end of the deque.
-func (d *ListDeque[T]) PopFront(v T) (T, bool) {
+func (d *ListDeque[T]) PopFront() (T, bool) {
 	return d.l.PopFront()
 }
 
