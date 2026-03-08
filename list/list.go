@@ -79,8 +79,8 @@ func New[T any]() *List[T] {
 	return &res
 }
 
-// NewValue returns an initialized List value. It can be useful for embedding
-// or advanced use cases. Most users should prefer New().
+// NewValue returns an initialized List. It can be useful for
+// advanced use cases. Most users should prefer New().
 func NewValue[T any]() List[T] {
 	head := new(node[T])
 	tail := new(node[T])
@@ -114,16 +114,6 @@ func Append[T any](list *List[T], v T) *List[T] {
 	}
 	list.Add(v)
 	return list
-}
-
-// Len returns the number of items in the list.
-func (l *List[T]) Len() int {
-	return l.len
-}
-
-// IsEmpty check if the list is empty.
-func (l *List[T]) IsEmpty() bool {
-	return l.len == 0
 }
 
 // String implements fmt.Stringer, used for %v and %+v.
@@ -199,6 +189,16 @@ func (l *List[T]) Equals(other *List[T], eq func(T, T) bool) bool {
 			return false
 		}
 	}
+}
+
+// Len returns the number of items in the list.
+func (l *List[T]) Len() int {
+	return l.len
+}
+
+// IsEmpty checks if the list is empty.
+func (l *List[T]) IsEmpty() bool {
+	return l.len == 0
 }
 
 // Front returns the first item and true if possible, zero value
