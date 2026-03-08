@@ -15,13 +15,30 @@
 // Package chainyq provides generic data structures and iterator utilities.
 //
 // The core types are concrete and optimized for speed. Interfaces
-// such as [Iterator] are defined for convenience and to simplify testing,
-// but using interfaces introduces dynamic dispatch, which is significantly
-// slower, even when used as generic type parameter constraint. Prefer concrete
-// types when possible.
+// such as [Deque] or [Iterator] are defined for convenience.
+// Note that using interfaces introduces dynamic dispatch, which can be
+// noticeably slower in some cases, even when used as generic type parameter
+// constraint. Prefer concrete types for performance-sensitive cases.
 package chainyq
 
 import "github.com/zelr0x/chainyq/seq"
+
+type Collection[T any] interface {
+    Len() int
+    IsEmpty() bool
+}
+
+type Deque[T any] interface {
+    Collection[T]
+    
+    PushBack(T)
+    PopBack() (T, bool)
+    Back() (T, bool)
+    
+    PushFront(T)
+    PopFront() (T, bool)
+    Front() (T, bool)
+}
 
 type Nexter[T any] interface {
     Next() (T, bool)
