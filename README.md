@@ -137,3 +137,12 @@ import (
 	deque "github.com/zelr0x/chainyq/deque/listdeque"
 )
 ```
+
+### SyncListDeque
+Synchronized version of `ListDeque` is available as `SyncListDeque`. It has the same
+core interface and can be imported like this:
+```go
+import (
+	deque "github.com/zelr0x/chainyq/deque/listdeque/syncdeque"
+)
+```
