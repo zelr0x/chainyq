@@ -36,6 +36,39 @@ func AssertEq[T comparable](
 	}
 }
 
+func AssertNotEq[T comparable](
+	t *testing.T,
+	notWant T,
+	got T,
+	msg ...string,
+) {
+	t.Helper()
+	if got != notWant {
+		return
+	}
+	if len(msg) > 0 {
+		t.Errorf("%s: want not equal to %v, got %v", msg[0], notWant, got)
+	} else {
+		t.Errorf("want not equal to %v, got %v", notWant, got)
+	}
+}
+
+func AssertCommaOk[T comparable](
+	t *testing.T,
+	want T,
+	wantOK bool,
+	got T,
+	gotOK bool,
+	msg ...string,
+) {
+	t.Helper()
+	if wantOK {
+		AssertEqOk(t, want, got, gotOK, msg...)
+	} else {
+		AssertZeroFalse(t, got, gotOK, msg...)
+	}
+}
+
 func AssertEqOk[T comparable](
 	t *testing.T,
 	want T,

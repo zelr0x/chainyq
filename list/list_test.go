@@ -15,75 +15,50 @@
 package list
 
 import (
-	"slices"
+	"fmt"
 	"testing"
+
+	. "github.com/zelr0x/chainyq/internal/testutil"
 )
 
 func TestNewAndIsEmpty(t *testing.T) {
 	l := New[int]()
-	if !l.IsEmpty() {
-		t.Errorf("expected new list to be empty")
-	}
-	if got := l.Len(); got != 0 {
-		t.Errorf("expected length 0, got %d", got)
-	}
+	AssertTrue(t, l.IsEmpty(), "new list must be empty")
+	AssertEq(t, 0, l.Len(), "new list must have length 0")
 }
 
 func TestFromSlice(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []int
-		expected []int
+		name  string
+		input []int
+		want  []int
 	}{
 		{"empty slice", []int{}, []int{}},
 		{"single element", []int{42}, []int{42}},
 		{"multiple elements", []int{1, 2, 3}, []int{1, 2, 3}},
-		{"large slice", func() []int {
-			s := make([]int, 150)
-			for i := 0; i < 150; i++ {
-				s[i] = i
-			}
-			return s
-		}(), func() []int {
-			s := make([]int, 150)
-			for i := 0; i < 150; i++ {
-				s[i] = i
-			}
-			return s
-		}()},
+		{"large slice", SliceFromRangeExcl(t, 0, 150), SliceFromRangeExcl(t, 0, 150)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := FromSlice(tt.input)
 			got := l.ToSlice()
-			if len(got) != len(tt.expected) {
-				t.Fatalf("expected length %d, got %d", len(tt.expected), len(got))
-			}
-			for i := range tt.expected {
-				if got[i] != tt.expected[i] {
-					t.Errorf("at index %d, got %d, want %d", i, got[i], tt.expected[i])
-				}
-			}
+			AssertSliceEq(t, tt.want, got)
 		})
 	}
 }
 
 func TestAppendAndLen(t *testing.T) {
 	var l *List[int]
-	if got := Len(l); got != 0 {
-		t.Errorf("expected 0, got %d", got)
-	}
+	AssertEq(t, 0, Len(l))
 	l = Append(l, 1)
-	if got := Len(l); got != 1 {
-		t.Errorf("expected 1, got %d", got)
-	}
+	AssertEq(t, 1, Len(l))
 }
 
 func TestAddAndLen(t *testing.T) {
 	tests := []struct {
-		name     string
-		values   []int
-		expected int
+		name    string
+		want    []int
+		wantLen int
 	}{
 		{"single add", []int{42}, 1},
 		{"multiple adds", []int{1, 2, 3}, 3},
@@ -91,37 +66,30 @@ func TestAddAndLen(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := FromSlice[int](tt.values)
-			if got := l.Len(); got != tt.expected {
-				t.Errorf("expected length %d, got %d", tt.expected, got)
+			l := New[int]()
+			for _, v := range tt.want {
+				l.Add(v)
 			}
-			if (tt.expected == 0) != l.IsEmpty() {
-				t.Errorf("IsEmpty mismatch: expected %v", tt.expected == 0)
-			}
+			AssertEq(t, tt.wantLen, l.Len())
+			AssertSliceEq(t, tt.want, l.ToSlice())
 		})
 	}
 }
 
 func TestString(t *testing.T) {
 	l := New[int]()
-	if got := l.String(); got != "List[]" {
-		t.Errorf("expected empty list 'List[]', got %q", got)
-	}
+	AssertEq(t, "List[]", l.String())
 	l.Add(1).Add(2).Add(3)
-	got := l.String()
-	if got != "List[1, 2, 3]" {
-		t.Errorf("unexpected string representation: %q", got)
-	}
+	AssertEq(t, "List[1, 2, 3]", l.String())
 }
 
 func TestEquals(t *testing.T) {
 	eq := func(a, b int) bool { return a == b }
-
 	tests := []struct {
-		name     string
-		a        []int
-		b        []int
-		expected bool
+		name string
+		a    []int
+		b    []int
+		want bool
 	}{
 		{"both empty", []int{}, []int{}, true},
 		{"same elements", []int{1, 2, 3}, []int{1, 2, 3}, true},
@@ -130,11 +98,9 @@ func TestEquals(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l1 := FromSlice[int](tt.a)
-			l2 := FromSlice[int](tt.b)
-			if got := l1.Equals(l2, eq); got != tt.expected {
-				t.Errorf("Equals mismatch: expected %v, got %v", tt.expected, got)
-			}
+			l1 := FromSlice(tt.a)
+			l2 := FromSlice(tt.b)
+			AssertEq(t, tt.want, l1.Equals(l2, eq))
 		})
 	}
 }
@@ -154,35 +120,34 @@ func TestFrontAndBack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := FromSlice[int](tt.values)
-			if got, ok := l.Front(); got != tt.wantFront || ok != tt.wantFrontOK {
-				t.Errorf("Front() = (%d,%v), want (%d,%v)", got, ok, tt.wantFront, tt.wantFrontOK)
-			}
-			if got, ok := l.Back(); got != tt.wantBack || ok != tt.wantBackOK {
-				t.Errorf("Back() = (%d,%v), want (%d,%v)", got, ok, tt.wantBack, tt.wantBackOK)
-			}
+			l := FromSlice(tt.values)
+			got, ok := l.Front()
+			AssertEq(t, tt.wantFront, got)
+			AssertEq(t, tt.wantFrontOK, ok)
+
+			got, ok = l.Back()
+			AssertEq(t, tt.wantBack, got)
+			AssertEq(t, tt.wantBackOK, ok)
 		})
 	}
 }
 
 func TestFrontPtrAndBackPtr(t *testing.T) {
 	l := New[int]()
-	if got, ok := l.FrontPtr(); got != nil || ok {
-		t.Errorf("FrontPtr on empty list = (%v,%v), want (nil,false)", got, ok)
-	}
-	if got, ok := l.BackPtr(); got != nil || ok {
-		t.Errorf("BackPtr on empty list = (%v,%v), want (nil,false)", got, ok)
-	}
+	
+	got, ok := l.FrontPtr()
+	AssertZeroFalse(t, got, ok)
+	got, ok = l.BackPtr()
+	AssertZeroFalse(t, got, ok)
+
 	l.PushBack(10)
 	l.PushBack(20)
 	front, okFront := l.FrontPtr()
+	AssertNotNil(t, front, "FrontPtr")
+	AssertEqOk(t, 10, *front, okFront, "FrontPtr")
 	back, okBack := l.BackPtr()
-	if !okFront || front == nil || *front != 10 {
-		t.Errorf("FrontPtr = (%v,%v), want (10,true)", front, okFront)
-	}
-	if !okBack || back == nil || *back != 20 {
-		t.Errorf("BackPtr = (%v,%v), want (20,true)", back, okBack)
-	}
+	AssertNotNil(t, front, "BackPtr")
+	AssertEqOk(t, 20, *back, okBack, "BackPtr")
 }
 
 func TestPushFrontAndPushBack(t *testing.T) {
@@ -192,15 +157,9 @@ func TestPushFrontAndPushBack(t *testing.T) {
 	l.PushBack(3)
 	front, _ := l.Front()
 	back, _ := l.Back()
-	if front != 1 {
-		t.Errorf("expected front=1, got %d", front)
-	}
-	if back != 3 {
-		t.Errorf("expected back=3, got %d", back)
-	}
-	if got := l.Len(); got != 3 {
-		t.Errorf("expected length 3, got %d", got)
-	}
+	AssertEq(t, 1, front)
+	AssertEq(t, 3, back)
+	AssertEq(t, 3, l.Len())
 }
 
 func TestPopFront(t *testing.T) {
@@ -217,14 +176,11 @@ func TestPopFront(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := FromSlice[int](tt.values)
+			l := FromSlice(tt.values)
 			got, ok := l.PopFront()
-			if got != tt.wantVal || ok != tt.wantOK {
-				t.Errorf("PopFront() = (%d,%v), want (%d,%v)", got, ok, tt.wantVal, tt.wantOK)
-			}
-			if l.Len() != tt.wantLen {
-				t.Errorf("after PopFront, Len() = %d, want %d", l.Len(), tt.wantLen)
-			}
+			AssertEq(t, tt.wantVal, got)
+			AssertEq(t, tt.wantOK, ok)
+			AssertEq(t, tt.wantLen, l.Len())
 		})
 	}
 }
@@ -243,14 +199,11 @@ func TestPopBack(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := FromSlice[int](tt.values)
+			l := FromSlice(tt.values)
 			got, ok := l.PopBack()
-			if got != tt.wantVal || ok != tt.wantOK {
-				t.Errorf("PopBack() = (%d,%v), want (%d,%v)", got, ok, tt.wantVal, tt.wantOK)
-			}
-			if l.Len() != tt.wantLen {
-				t.Errorf("after PopBack, Len() = %d, want %d", l.Len(), tt.wantLen)
-			}
+			AssertEq(t, tt.wantVal, got)
+			AssertEq(t, tt.wantOK, ok)
+			AssertEq(t, tt.wantLen, l.Len())
 		})
 	}
 }
@@ -272,23 +225,11 @@ func TestInsert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := New[int]()
-			for _, v := range tt.initial {
-				l.PushBack(v)
-			}
+			l := FromSlice(tt.initial)
 			ok := l.Insert(tt.idx, tt.val)
-			if ok != tt.wantOK {
-				t.Errorf("Insert(%d,%d) ok=%v, want %v", tt.idx, tt.val, ok, tt.wantOK)
-			}
+			AssertEq(t, tt.wantOK, ok)
 			got := l.ToSlice()
-			if len(got) != len(tt.wantResult) {
-				t.Fatalf("expected slice length %d, got %d", len(tt.wantResult), len(got))
-			}
-			for i := range got {
-				if got[i] != tt.wantResult[i] {
-					t.Errorf("at index %d, got %d, want %d", i, got[i], tt.wantResult[i])
-				}
-			}
+			AssertSliceEq(t, tt.wantResult, got)
 		})
 	}
 }
@@ -310,63 +251,38 @@ func TestRemove(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := New[int]()
-			for _, v := range tt.initial {
-				l.PushBack(v)
-			}
+			l := FromSlice(tt.initial)
 			ok := l.Remove(tt.idx)
-			if ok != tt.wantOK {
-				t.Errorf("Remove(%d) ok=%v, want %v", tt.idx, ok, tt.wantOK)
-			}
+			AssertEq(t, tt.wantOK, ok)
 			got := l.ToSlice()
-			if len(got) != len(tt.wantResult) {
-				t.Fatalf("expected slice length %d, got %d", len(tt.wantResult), len(got))
-			}
-			for i := range got {
-				if got[i] != tt.wantResult[i] {
-					t.Errorf("at index %d, got %d, want %d", i, got[i], tt.wantResult[i])
-				}
-			}
+			AssertSliceEq(t, tt.wantResult, got)
 		})
 	}
 }
 
 func TestInsertAndRemoveLarge(t *testing.T) {
 	const size = 150
-	l := New[int]()
-	for i := 0; i < size; i++ {
-		l.PushBack(i)
-	}
+	l := listFromRangeExcl(t, 0, size)
+
 	// Insert in the middle
-	if !l.Insert(size/2, 999) {
-		t.Errorf("Insert at middle failed")
-	}
-	if l.Len() != size+1 {
-		t.Errorf("expected length %d, got %d", size+1, l.Len())
-	}
-	if val, _ := l.Get(size / 2); val != 999 {
-		t.Errorf("expected inserted value 999 at index %d, got %d", size/2, val)
-	}
+	AssertTrue(t, l.Insert(size/2, 999), "Insert at middle")
+	AssertEq(t, size+1, l.Len(), "length changed after insert")
+
+	val, ok := l.Get(size/2)
+	AssertEqOk(t, 999, val, ok, "get inserted in middle returns expected value")
+
 	// Remove from the middle
-	if !l.Remove(size / 2) {
-		t.Errorf("Remove at middle failed")
-	}
-	if l.Len() != size {
-		t.Errorf("expected length %d after remove, got %d", size, l.Len())
-	}
-	if val, _ := l.Get(size / 2); val == 999 {
-		t.Errorf("value 999 should have been removed")
-	}
-	// Remove front and back
-	if !l.Remove(0) {
-		t.Errorf("Remove front failed")
-	}
-	if !l.Remove(l.Len() - 1) {
-		t.Errorf("Remove back failed")
-	}
-	if l.Len() != size-2 {
-		t.Errorf("expected length %d after front/back remove, got %d", size-2, l.Len())
-	}
+	AssertTrue(t, l.Remove(size/2), "Remove at middle")
+	AssertEq(t, size, l.Len(), "size after Remove")
+
+	val, ok = l.Get(size/2)
+	AssertTrue(t, ok)
+	AssertNotEq(t, 999, val, "value 999 should have been removed")
+	
+	AssertTrue(t, l.Remove(0), "Remove first item")
+	AssertEq(t, size-1, l.Len(), "Len after one item removed")
+	AssertTrue(t, l.Remove(l.Len()-1), "Remove last item")
+	AssertEq(t, size-2, l.Len(), "Len after two items removed")
 }
 
 func TestIndexOf(t *testing.T) {
@@ -386,14 +302,9 @@ func TestIndexOf(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := New[int]()
-			for _, v := range tt.values {
-				l.PushBack(v)
-			}
+			l := FromSlice(tt.values)
 			got := l.IndexOf(tt.target, eq)
-			if got != tt.wantIdx {
-				t.Errorf("IndexOf(%d) = %d, want %d", tt.target, got, tt.wantIdx)
-			}
+			AssertEq(t, tt.wantIdx, got, fmt.Sprintf("IndexOf(%d)", tt.target))
 		})
 	}
 }
@@ -415,14 +326,9 @@ func TestLastIndexOf(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := New[int]()
-			for _, v := range tt.values {
-				l.PushBack(v)
-			}
+			l := FromSlice(tt.values)
 			got := l.LastIndexOf(tt.target, eq)
-			if got != tt.wantIdx {
-				t.Errorf("LastIndexOf(%d) = %d, want %d", tt.target, got, tt.wantIdx)
-			}
+			AssertEq(t, tt.wantIdx, got, fmt.Sprintf("LastIndexOf(%d)", tt.target))
 		})
 	}
 }
@@ -444,11 +350,9 @@ func TestContains(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := FromSlice[int](tt.values)
+			l := FromSlice(tt.values)
 			got := l.Contains(tt.target, eq)
-			if got != tt.want {
-				t.Errorf("Contains(%d) = %v, want %v", tt.target, got, tt.want)
-			}
+			AssertEq(t, tt.want, got, fmt.Sprintf("Contains(%d)", tt.target))
 		})
 	}
 }
@@ -470,148 +374,90 @@ func TestGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := FromSlice[int](tt.values)
+			l := FromSlice(tt.values)
 			gotVal, gotOK := l.Get(tt.idx)
-			if gotVal != tt.wantVal || gotOK != tt.wantOK {
-				t.Errorf("Get(%d) = (%d,%v), want (%d,%v)", tt.idx, gotVal, gotOK, tt.wantVal, tt.wantOK)
-			}
+			AssertCommaOk(t, tt.wantVal, tt.wantOK, gotVal, gotOK, fmt.Sprintf("Get(%d)", tt.idx))
 		})
 	}
 }
 
 func TestForEach(t *testing.T) {
-	l := New[int]()
-	l.PushBack(1)
-	l.PushBack(2)
-	l.PushBack(3)
+	l := listFromRangeIncl(t, 1, 3)
 	var visited []int
 	l.ForEach(func(v int) bool {
 		visited = append(visited, v)
 		return true
 	})
 	want := []int{1, 2, 3}
-	if len(visited) != len(want) {
-		t.Fatalf("expected %d elements, got %d", len(want), len(visited))
-	}
-	for i := range want {
-		if visited[i] != want[i] {
-			t.Errorf("at index %d, got %d, want %d", i, visited[i], want[i])
-		}
-	}
+	AssertSliceEq(t, want, visited)
 	// Early stop
 	visited = nil
 	l.ForEach(func(v int) bool {
 		visited = append(visited, v)
 		return v < 2
 	})
-	if len(visited) != 2 {
-		t.Errorf("expected early stop after 2 elements, got %d", len(visited))
-	}
+	AssertEq(t, 2, len(visited), "expected early stop after 2 items")
 }
 
 func TestForEachPtr(t *testing.T) {
-	l := New[int]()
-	l.PushBack(10)
-	l.PushBack(20)
-	var visited []int
+	l := New[int]().Add(10).Add(20)
 	l.ForEachPtr(func(p *int) bool {
-		if p == nil {
-			t.Errorf("unexpected nil pointer")
-			return false
-		}
-		visited = append(visited, *p)
+		AssertNotNil(t, p)
+		*p *= 2
 		return true
 	})
-	want := []int{10, 20}
-	for i := range want {
-		if visited[i] != want[i] {
-			t.Errorf("at index %d, got %d, want %d", i, visited[i], want[i])
-		}
-	}
+	AssertSliceEq(t, []int{20, 40}, l.ToSlice())
 }
 
 func TestRemoveIf(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 5; i++ {
-		l.PushBack(i)
-	}
+	l := listFromRangeIncl(t, 1, 5)
 	removed := l.RemoveIf(func(v int) bool { return v%2 == 0 })
-	if removed != 2 {
-		t.Errorf("expected 2 elements removed, got %d", removed)
-	}
+	AssertEq(t, 2, removed, "expected 2 items removed")
 	got := l.ToSlice()
-	want := []int{1, 3, 5}
-	if len(got) != len(want) {
-		t.Fatalf("expected %d elements, got %d", len(want), len(got))
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("at index %d, got %d, want %d", i, got[i], want[i])
-		}
-	}
+	AssertSliceEq(t, []int{1, 3, 5}, got)
 }
 
 func TestConcat(t *testing.T) {
-	l1 := New[int]()
-	l2 := New[int]()
-	l1.PushBack(1)
-	l1.PushBack(2)
-	l2.PushBack(3)
-	l2.PushBack(4)
+	l1 := FromSlice([]int{1, 2})
+	l2 := FromSlice([]int{3, 4})
 	l1.Concat(l2)
 	got := l1.ToSlice()
 	want := []int{1, 2, 3, 4}
-	if len(got) != len(want) {
-		t.Fatalf("expected %d elements, got %d", len(want), len(got))
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("at index %d, got %d, want %d", i, got[i], want[i])
-		}
-	}
-
-	if !l2.IsEmpty() {
-		t.Errorf("expected other list to be empty after Concat")
-	}
+	AssertSliceEq(t, want, got)
+	AssertTrue(t, l2.IsEmpty(), "expected second list to be empty after Concat")
 }
 
 func TestClear(t *testing.T) {
-	l := New[int]()
-	l.PushBack(1)
-	l.PushBack(2)
-	l.PushBack(3)
-
+	l := listFromRangeIncl(t, 1, 20)
 	l.Clear()
-	if !l.IsEmpty() {
-		t.Errorf("expected list to be empty after Clear")
-	}
-	if l.Len() != 0 {
-		t.Errorf("expected length 0 after Clear, got %d", l.Len())
-	}
+	AssertTrue(t, l.IsEmpty(), "list should be empty after Clear")
+	AssertZero(t, l.Len(), "list Len should be 0 after Clear")
 }
 
-func TestIter(t *testing.T) {
+func TestNewIterNotNil(t *testing.T) {
 	l := New[int]()
-	it := l.Iter()
-	if it == nil {
-		t.Errorf("expected non-nil iterator for empty list")
-	}
+	AssertNotNil(t, l.Iter())
 	l.PushBack(1)
-	it2 := l.Iter()
-	if it2 == nil {
-		t.Errorf("expected non-nil iterator for non-empty list")
-	}
+	AssertNotNil(t, l.Iter())
+}
+
+func TestNewRevIterNotNil(t *testing.T) {
+	l := New[int]()
+	AssertNotNil(t, l.RevIter())
+	l.PushBack(1)
+	AssertNotNil(t, l.RevIter())
+}
+
+func TestNewBidiIterNotNil(t *testing.T) {
+	l := New[int]()
+	AssertNotNil(t, l.BidiIter())
+	l.PushBack(1)
+	AssertNotNil(t, l.BidiIter())
 }
 
 func TestSliceAndPtrSlice(t *testing.T) {
-	lEven := New[int]()
-	for i := 1; i <= 6; i++ {
-		lEven.PushBack(i)
-	}
-	lOdd := New[int]()
-	for i := 1; i <= 5; i++ {
-		lOdd.PushBack(i)
-	}
+	lEven := listFromRangeIncl(t, 1, 6)
+	lOdd := listFromRangeIncl(t, 1, 5)
 	tests := []struct {
 		name     string
 		list     *List[int]
@@ -635,542 +481,429 @@ func TestSliceAndPtrSlice(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.list.Slice(tt.start, tt.end)
-			if len(got) != len(tt.wantVals) {
-				t.Fatalf("Slice length = %d, want %d", len(got), len(tt.wantVals))
-			}
-			for i := range tt.wantVals {
-				if got[i] != tt.wantVals[i] {
-					t.Errorf("Slice at %d = %d, want %d", i, got[i], tt.wantVals[i])
-				}
-			}
-
-			gotPtrs := tt.list.PtrSlice(tt.start, tt.end)
-			if len(gotPtrs) != len(tt.wantVals) {
-				t.Fatalf("PtrSlice length = %d, want %d", len(tt.wantVals), len(gotPtrs))
-			}
-			for i := range tt.wantVals {
-				if *gotPtrs[i] != tt.wantVals[i] {
-					t.Errorf("PtrSlice at %d = %d, want %d", i, *gotPtrs[i], tt.wantVals[i])
-				}
-			}
+			AssertSliceEq(t, tt.wantVals, got, "Slice")
+			ptrGot := tt.list.PtrSlice(tt.start, tt.end)
+			AssertPtrSliceEq(t, tt.wantVals, ptrGot, "PtrSlice")
 		})
 	}
 }
 
 func TestToSliceAndToPtrSlice(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 3; i++ {
-		l.PushBack(i)
-	}
+	l := listFromRangeIncl(t, 1, 3)
 	got := l.ToSlice()
 	want := []int{1, 2, 3}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("ToSlice at %d = %d, want %d", i, got[i], want[i])
-		}
-	}
-	gotPtrs := l.ToPtrSlice()
-	for i := range want {
-		if *gotPtrs[i] != want[i] {
-			t.Errorf("ToPtrSlice at %d = %d, want %d", i, *gotPtrs[i], want[i])
-		}
-	}
+	AssertSliceEq(t, want, got)
+	ptrGot := l.ToPtrSlice()
+	AssertPtrSliceEq(t, want, ptrGot)
 }
 
 func TestToChanAndToPtrChan(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 3; i++ {
-		l.PushBack(i)
-	}
+	l := listFromRangeIncl(t, 1, 3)
 
 	ch := l.ToChan(0)
-	var vals []int
+	var got []int
 	for v := range ch {
-		vals = append(vals, v)
+		got = append(got, v)
 	}
 	want := []int{1, 2, 3}
-	for i := range want {
-		if vals[i] != want[i] {
-			t.Errorf("ToChan at %d = %d, want %d", i, vals[i], want[i])
-		}
-	}
+	AssertSliceEq(t, want, got, "ToChan")
 
 	ptrCh := l.ToPtrChan(0)
-	var ptrVals []int
+	var ptrGot []int
 	for p := range ptrCh {
 		if p == nil {
 			t.Errorf("unexpected nil pointer from ToPtrChan")
 			continue
 		}
-		ptrVals = append(ptrVals, *p)
+		ptrGot = append(ptrGot, *p)
 	}
-	for i := range want {
-		if ptrVals[i] != want[i] {
-			t.Errorf("ToPtrChan at %d = %d, want %d", i, ptrVals[i], want[i])
-		}
-	}
+	AssertSliceEq(t, want, ptrGot, "ToPtrChan")
 }
 
-func TestIterResetPrevAndResetBackNext(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 3; i++ {
-		l.PushBack(i)
-	}
-	it := l.Iter()
+func TestBidiIterDoesNotAllowToGoPastSentinel(t *testing.T) {
+	l := listFromRangeIncl(t, 1, 3)
+	it := l.BidiIter()
 	it.Reset()
 	val, ok := it.Prev()
-	if ok {
-		t.Errorf("Prev() after Reset should be false, got (%d,true)", val)
-	}
+	AssertZeroFalse(t, val, ok, "Prev after Reset should be false")
 	it.ResetBack()
 	val, ok = it.Next()
-	if ok {
-		t.Errorf("Next() after ResetBack should be false, got (%d,true)", val)
-	}
+	AssertZeroFalse(t, val, ok, "Next after ResetBack should be false")
 }
 
-func TestIterCloneResetAndCurrent(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 3; i++ {
-		l.PushBack(i)
-	}
-	it := l.Iter()
-	if it == nil {
-		t.Fatalf("Iter() returned nil")
-	}
-	// Current should be invalid before Next is called
+func TestBidiIterCloneResetAndCurrent(t *testing.T) {
+	l := listFromRangeIncl(t, 1, 3)
+	it := l.BidiIter()
+	AssertNotNil(t, it)
 	val, ok := it.Current()
-	if ok {
-		t.Errorf("Current() should be false before Next, got (%d,true)", val)
-	}
+	AssertZeroFalse(t, val, ok, "Current should be false before Next")
 	ptr, ok := it.CurrentPtr()
-	if ok || ptr != nil {
-		t.Errorf("CurrentPtr() should be (nil,false) before Next, got (%v,%v)", ptr, ok)
-	}
+	AssertZeroFalse(t, ptr, ok, "CurrentPtr should be false before Next")
+
 	// Advance once
 	it.Next()
 	val, ok = it.Current()
-	if !ok || val != 1 {
-		t.Errorf("Current() after Next = (%d,%v), want (1,true)", val, ok)
-	}
+	AssertEqOk(t, 1, val, ok, "Current after next")
 	ptr, ok = it.CurrentPtr()
-	if !ok || ptr == nil || *ptr != 1 {
-		t.Errorf("CurrentPtr() after Next = (%v,%v), want (1,true)", ptr, ok)
-	}
+	AssertNotNil(t, ptr, "CurrentPtr after next not nil")
+	AssertEqOk(t, 1, *ptr, ok, "CurrentPtr after next")
+
 	// Clone should point to same position
 	clone := it.Clone()
 	valClone, okClone := clone.Current()
-	if !okClone || valClone != 1 {
-		t.Errorf("Clone Current() = (%d,%v), want (1,true)", valClone, okClone)
-	}
+	AssertEqOk(t, 1, valClone, okClone, "Current after Clone")
+
 	// Reset should go back to head
-	it.Reset()
-	it.Next()
+	it.Reset().Next()
 	val, ok = it.Current()
-	if !ok || val != 1 {
-		t.Errorf("Reset then Next Current() = (%d,%v), want (1,true)", val, ok)
-	}
+	AssertEqOk(t, 1, val, ok, "Current after Reset Next")
+
 	// ResetBack should go to tail
-	it.ResetBack()
-	val, ok = it.Current()
-	if ok {
-		t.Errorf("ResetBack then Current() = %d,%v), want (0, false)", val, ok)
-	}
+	val, ok = it.ResetBack().Current()
+	AssertZeroFalse(t, val, ok, "Current after ResetBack")
+
 	it.Prev() // step back once to get to last item
 	it.Next() // step forward once - should not go to tail
 	val, ok = it.Current()
-	if !ok || val != 3 {
-		t.Errorf("ResetBack then Prev Next Current() = (%d,%v), want (3,true)", val, ok)
-	}
+	AssertEqOk(t, 3, val, ok, "Current after ResetBack Prev Next")
 }
 
-func TestIterEmptyList(t *testing.T) {
+func TestBidiIterEmptyList(t *testing.T) {
 	l := New[int]()
-	it := l.Iter()
-	if it == nil {
-		t.Fatalf("Iter() returned nil for empty list")
-	}
+	it := l.BidiIter()
+	AssertNotNil(t, it)
 	val, ok := it.Current()
-	if ok || val != 0 {
-		t.Errorf("Current() on empty list = (%d,%v), want (0,false)", val, ok)
-	}
+	AssertZeroFalse(t, val, ok, "Current on empty list")
 	ptr, ok := it.CurrentPtr()
-	if ok || ptr != nil {
-		t.Errorf("CurrentPtr() on empty list = (%v,%v), want (nil,false)", ptr, ok)
-	}
+	AssertZeroFalse(t, ptr, ok, "CurrentPtr on empty list")
+
 	// Reset should still be safe
 	it.Reset()
 	val, ok = it.Current()
-	if ok {
-		t.Errorf("Current() after Reset on empty list should be false, got (%d,true)", val)
-	}
+	AssertZeroFalse(t, val, ok, "Current after Reset on empty list")
+
 	// ResetBack should also be safe
 	it.ResetBack()
 	val, ok = it.Current()
-	if ok {
-		t.Errorf("Current() after ResetBack on empty list should be false, got (%d,true)", val)
-	}
+	AssertZeroFalse(t, val, ok, "Current after ResetBack on empty list")
 }
 
-func TestIterNavigation(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 3; i++ {
-		l.PushBack(i)
-	}
-	it := l.Iter()
-	if !it.HasNext() {
-		t.Errorf("HasNext() at start should be true")
-	}
-	if it.HasPrev() {
-		t.Errorf("HasPrev() at start should be false")
-	}
-	// Peek should show first element without advancing
+func TestBidiIterNavigation(t *testing.T) {
+	l := listFromRangeIncl(t, 1, 3)
+	it := l.BidiIter()
+	AssertTrue(t, it.HasNext(), "HasNext at start should be true")
+	AssertFalse(t, it.HasPrev(), "HasPrev at start should be false")
+
 	val, ok := it.Peek()
-	if !ok || val != 1 {
-		t.Errorf("Peek() = (%d,%v), want (1,true)", val, ok)
-	}
-	// Next should advance into first element
+	AssertEqOk(t, 1, val, ok, "Peek should show first element without advancing")
 	val, ok = it.Next()
-	if !ok || val != 1 {
-		t.Errorf("Next() = (%d,%v), want (1,true)", val, ok)
-	}
-	// Now at element 1 (first non-sentinel), HasPrev should still be false
-	if it.HasPrev() {
-		t.Errorf("HasPrev() at first element should be false")
-	}
-	// Advance forward again
+	AssertEqOk(t, 1, val, ok, "Next should advance into first element")
+
+	AssertFalse(t, it.HasPrev(), "HasPrev at first non-sentinel")
+
 	val, ok = it.Next()
-	if !ok || val != 2 {
-		t.Errorf("Next() = (%d,%v), want (2,true)", val, ok)
-	}
-	// Now at element 2, HasPrev should be true
-	if !it.HasPrev() {
-		t.Errorf("HasPrev() should be true at second element")
-	}
-	// Prev should move back to 1
+	AssertEqOk(t, 2, val, ok, "Next should advance further")
+
+	AssertTrue(t, it.HasPrev(), "HasPrev at second element")
+
 	val, ok = it.Prev()
-	if !ok || val != 1 {
-		t.Errorf("Prev() = (%d,%v), want (1,true)", val, ok)
-	}
+	AssertEqOk(t, 1, val, ok, "Prev should step back")
+	val, ok = it.Peek()
+	AssertEqOk(t, 2, val, ok, "Peek after Prev should show second")
 }
 
-func TestIterNavigationEmptyList(t *testing.T) {
+func TestBidiIterNavigationEmptyList(t *testing.T) {
 	l := New[int]()
-	it := l.Iter()
+	it := l.BidiIter()
 
-	if it.HasNext() {
-		t.Errorf("HasNext() on empty list should be false")
-	}
-	if it.HasPrev() {
-		t.Errorf("HasPrev() on empty list should be false")
-	}
+	AssertFalse(t, it.HasNext(), "HasNext on empty list")
+	AssertFalse(t, it.HasPrev(), "HasPrev on empty list")
 
 	val, ok := it.Next()
-	if ok || val != 0 {
-		t.Errorf("Next() on empty list = (%d,%v), want (0,false)", val, ok)
-	}
+	AssertZeroFalse(t, val, ok, "Next on empty list")
 	ptr, ok := it.NextPtr()
-	if ok || ptr != nil {
-		t.Errorf("NextPtr() on empty list = (%v,%v), want (nil,false)", ptr, ok)
-	}
+	AssertZeroFalse(t, ptr, ok, "NextPtr on empty list")
 
 	val, ok = it.Prev()
-	if ok || val != 0 {
-		t.Errorf("Prev() on empty list = (%d,%v), want (0,false)", val, ok)
-	}
+	AssertZeroFalse(t, val, ok, "Prev on empty list")
 	ptr, ok = it.PrevPtr()
-	if ok || ptr != nil {
-		t.Errorf("PrevPtr() on empty list = (%v,%v), want (nil,false)", ptr, ok)
-	}
+	AssertZeroFalse(t, ptr, ok, "PrevPtr on empty list")
 
 	val, ok = it.Peek()
-	if ok || val != 0 {
-		t.Errorf("Peek() on empty list = (%d,%v), want (0,false)", val, ok)
-	}
+	AssertZeroFalse(t, val, ok, "Peek on empty list")
 	ptr, ok = it.PeekPtr()
-	if ok || ptr != nil {
-		t.Errorf("PeekPtr() on empty list = (%v,%v), want (nil,false)", ptr, ok)
-	}
+	AssertZeroFalse(t, ptr, ok, "PeekPtr on empty list")
 
 	val, ok = it.PeekBack()
-	if ok || val != 0 {
-		t.Errorf("PeekBack() on empty list = (%d,%v), want (0,false)", val, ok)
-	}
+	AssertZeroFalse(t, val, ok, "PeekBack on empty list")
 	ptr, ok = it.PeekBackPtr()
-	if ok || ptr != nil {
-		t.Errorf("PeekBackPtr() on empty list = (%v,%v), want (nil,false)", ptr, ok)
-	}
+	AssertZeroFalse(t, ptr, ok, "PeekBackPtr on empty list")
 }
 
-func TestIterRemoveAndInsert(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 3; i++ {
-		l.PushBack(i)
-	}
-	it := l.Iter()
+func TestBidiIterRemoveAndInsert(t *testing.T) {
+	l := listFromRangeIncl(t, 1, 3)
+	it := l.BidiIter()
 
-	// Remove and InsertBefore should fail while at head
 	val, ok := it.Remove()
-	if ok {
-		t.Errorf("Remove() at head sentinel should be false, got (%d,true)", val)
-	}
-	if it.InsertBefore(99) {
-		t.Errorf("InsertBefore() at head sentinel should be false")
-	}
+	AssertZeroFalse(t, val, ok, "Remove at head sentinel fails")
+	AssertFalse(t, it.InsertBefore(99), "InsertBefore at head sentinel fails")
 
-	// InsertBefore should succeed while at first item
 	it.Next()
-	if !it.InsertBefore(77) {
-		t.Errorf("InsertBefore() at first element should succeed")
-	}
-	want := []int{77, 1, 2, 3}
-	if got := l.ToSlice(); !slices.Equal(got, want) {
-		t.Errorf("InsertBefore failed, got %v, want %v", got, want)
-	}
+	AssertTrue(t, it.InsertBefore(77), "InsertBefore at first item should succeed")
+	AssertSliceEq(t, []int{77, 1, 2, 3}, l.ToSlice(), "InsertBefore at first item")
 
-	// Normal path
-	if !it.InsertAfter(88) {
-		t.Errorf("InsertAfter() at first element should succeed")
-	}
-	want = []int{77, 1, 88, 2, 3}
-	if got := l.ToSlice(); !slices.Equal(got, want) {
-		t.Errorf("InsertAfter failed, got %v, want %v", got, want)
-	}
+	AssertTrue(t, it.InsertAfter(88), "InsertAfter at first item should succeed")
+	AssertSliceEq(t, []int{77, 1, 88, 2, 3}, l.ToSlice(), "InsertAfter at first item")
 
 	it.Next()
 	val, ok = it.Remove()
-	if !ok || val != 88 {
-		t.Errorf("Remove() = (%d,%v), want (88,true)", val, ok)
-	}
-	want = []int{77, 1, 2, 3}
-	if got := l.ToSlice(); !slices.Equal(got, want) {
-		t.Errorf("Remove failed, got %v, want %v", got, want)
-	}
+	AssertEqOk(t, 88, val, ok, "Remove at middle")
+	AssertSliceEq(t, []int{77, 1, 2, 3}, l.ToSlice(), "Remove at middle")
 
-	// Remove and InsertAfter should fail while at tail
 	it.ResetBack()
 	val, ok = it.Remove()
-	if ok {
-		t.Errorf("Remove() at tail sentinel should be false, got (%d,true)", val)
-	}
-	if it.InsertAfter(99) {
-		t.Errorf("InsertAfter() at tail sentinel should be false")
-	}
+	AssertFalse(t, ok, "Remove at tail sentinel should fail")
+	AssertFalse(t, it.InsertAfter(99), "InsertAfter at tail sentinel should fail")
 
-	// InsertAfter should succeed while at the last element
 	it.Prev()
-	if !it.InsertAfter(66) {
-		t.Errorf("InsertAfter() at last element should succeed")
-	}
-	want = []int{77, 1, 2, 3, 66}
-	if got := l.ToSlice(); !slices.Equal(got, want) {
-		t.Errorf("InsertAfter failed, got %v, want %v", got, want)
-	}
+	AssertTrue(t, it.InsertAfter(66), "InsertAfter at at last item should succeed")
+	AssertSliceEq(t, []int{77, 1, 2, 3, 66}, l.ToSlice(), "InsertAfter at last item")
 }
 
 func TestIterForEachAndChannels(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 3; i++ {
-		l.PushBack(i)
-	}
+	l := listFromRangeIncl(t, 1, 3)
+	slice := []int{1, 2, 3}
 
 	// ForEach should visit all items starting from current position
 	it := l.Iter()
-	var vals []int
+	var got []int
 	it.ForEach(func(v int) bool {
-		vals = append(vals, v)
-		return true // continue
+		got = append(got, v)
+		return true
 	})
-	if !slices.Equal(vals, []int{1, 2, 3}) {
-		t.Errorf("ForEach got %v, want [1 2 3]", vals)
-	}
+	AssertSliceEq(t, slice, got, "ForEach")
 
 	// ForEachPtr should visit all items with pointers
 	it = l.Iter()
-	var ptrVals []int
+	var ptrGot []int
 	it.ForEachPtr(func(p *int) bool {
-		ptrVals = append(ptrVals, *p)
+		ptrGot = append(ptrGot, *p)
 		return true
 	})
-	if !slices.Equal(ptrVals, []int{1, 2, 3}) {
-		t.Errorf("ForEachPtr got %v, want [1 2 3]", ptrVals)
-	}
+	AssertSliceEq(t, slice, ptrGot, "ForEachPtr")
 
 	// ForEach can stop early if callback returns false
 	it = l.Iter()
-	vals = nil
+	got = nil
 	it.ForEach(func(v int) bool {
-		vals = append(vals, v)
+		got = append(got, v)
 		return v < 2 // stop after 2
 	})
-	if !slices.Equal(vals, []int{1, 2}) {
-		t.Errorf("ForEach early stop got %v, want [1 2]", vals)
+	var want []int
+	for _, v := range slice {
+		if v > 2 {
+			break
+		}
+		want = append(want, v)
 	}
+	AssertSliceEq(t, want, got, "ForEach early stop")
 
 	// ToChan should produce all remaining items
 	it = l.Iter()
 	ch := it.ToChan(0) // unbuffered
-	var chanVals []int
+	var chanGot []int
 	for v := range ch {
-		chanVals = append(chanVals, v)
+		chanGot = append(chanGot, v)
 	}
-	if !slices.Equal(chanVals, []int{1, 2, 3}) {
-		t.Errorf("ToChan got %v, want [1 2 3]", chanVals)
-	}
+	AssertSliceEq(t, slice, chanGot, "ToChan")
 
 	// ToPtrChan should produce pointers
 	it = l.Iter()
 	ptrCh := it.ToPtrChan(2) // buffered
-	var chanPtrVals []int
+	var chanPtrGot []int
 	for p := range ptrCh {
-		chanPtrVals = append(chanPtrVals, *p)
+		chanPtrGot = append(chanPtrGot, *p)
 	}
-	if !slices.Equal(chanPtrVals, []int{1, 2, 3}) {
-		t.Errorf("ToPtrChan got %v, want [1 2 3]", chanPtrVals)
+	AssertSliceEq(t, slice, chanPtrGot, "ToChanPtr")
+}
+
+func TestRevIterForEachAndChannels(t *testing.T) {
+	l := listFromRangeIncl(t, 1, 3)
+	revSlice := ReversedSlice(l.ToSlice())
+
+	// ForEach should visit all items starting from current position
+	it := l.RevIter()
+	var got []int
+	it.ForEach(func(v int) bool {
+		got = append(got, v)
+		return true
+	})
+	AssertSliceEq(t, revSlice, got, "ForEach")
+
+	// ForEachPtr should visit all items with pointers
+	it = l.RevIter()
+	var ptrGot []int
+	it.ForEachPtr(func(p *int) bool {
+		ptrGot = append(ptrGot, *p)
+		return true
+	})
+	AssertSliceEq(t, revSlice, ptrGot, "ForEachPtr")
+
+	// ForEach can stop early if callback returns false
+	it = l.RevIter()
+	got = nil
+	it.ForEach(func(v int) bool {
+		got = append(got, v)
+		return v > 2 // stop after 2
+	})
+	var want []int
+	for _, v := range revSlice {
+		if v < 2 {
+			break
+		}
+		want = append(want, v)
 	}
+	AssertSliceEq(t, want, got, "ForEach early stop")
+
+	it = l.RevIter()
+	ch := it.ToChan(0) // unbuffered
+	var chanGot []int
+	for v := range ch {
+		chanGot = append(chanGot, v)
+	}
+	AssertSliceEq(t, revSlice, chanGot, "ToChan")
+
+	it = l.RevIter()
+	ptrCh := it.ToPtrChan(2) // buffered
+	var chanPtrGot []int
+	for p := range ptrCh {
+		chanPtrGot = append(chanPtrGot, *p)
+	}
+	AssertSliceEq(t, revSlice, chanPtrGot, "ToPtrChan")
 }
 
 func TestIterForEachAndChannelsEmpty(t *testing.T) {
 	l := New[int]()
-	it := l.Iter()
-
-	// ForEach on empty list should do nothing
-	called := false
-	it.ForEach(func(v int) bool {
-		called = true
-		return true
-	})
-	if called {
-		t.Errorf("ForEach on empty list should not call function")
+	tests := []struct {
+		name string
+		it   interface {
+			ForEach(func(int) bool)
+			ToChan(cap int) <-chan int
+			ToPtrChan(cap int) <-chan *int
+		}
+	}{
+		{"Iter", l.Iter()},
+		{"BidiIter", l.BidiIter()},
+		{"RevIter", l.RevIter()},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			tt.it.ForEach(func(v int) bool {
+				called = true
+				return true
+			})
+			AssertFalse(t, called, "ForEach on empty list should not call the arg func")
 
-	// ToChan on empty list should yield nothing
-	ch := it.ToChan(1)
-	if v, ok := <-ch; ok {
-		t.Errorf("ToChan on empty list yielded %d", v)
-	}
-
-	// ToPtrChan on empty list should yield nothing
-	ptrCh := it.ToPtrChan(1)
-	if p, ok := <-ptrCh; ok {
-		t.Errorf("ToPtrChan on empty list yielded %v", p)
+			ch := tt.it.ToChan(1)
+			if v, ok := <-ch; ok {
+				t.Errorf("%s: ToChan on empty list yielded %d", tt.name, v)
+			}
+			ptrCh := tt.it.ToPtrChan(1)
+			if p, ok := <-ptrCh; ok {
+				t.Errorf("%s: ToPtrChan on empty list yielded %v", tt.name, p)
+			}
+		})
 	}
 }
 
 func TestIterTakeAndSkip(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 5; i++ {
-		l.PushBack(i)
+	n := 5
+	items := SliceFromRangeIncl(t, 1, n)
+	revItems := ReversedSlice(items)
+	l := FromSlice(items)
+	tests := []struct {
+		name  string
+		it    ListIterator[int]
+		items []int
+	}{
+		{"Iter", l.Iter(), items},
+		{"BidiIter", l.BidiIter(), items},
+		{"RevIter", l.RevIter(), revItems},
 	}
-
-	// TakeSlice should collect up to n items
-	it := l.Iter()
-	got := it.TakeSlice(3)
-	want := []int{1, 2, 3}
-	if !slices.Equal(got, want) {
-		t.Errorf("TakeSlice got %v, want %v", got, want)
-	}
-
-	// TakePtrSlice should collect pointers
-	it = l.Iter()
-	ptrs := it.TakePtrSlice(2)
-	if len(ptrs) != 2 || *ptrs[0] != 1 || *ptrs[1] != 2 {
-		t.Errorf("TakePtrSlice got %v, want [1,2]", ptrs)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			it := tt.it
+			k := n / 2
+			got := it.TakeSlice(k)
+			want := tt.items[:k]
+			AssertSliceEq(t, want, got, "TakeSlice")
+			ptrGot := it.TakePtrSlice(n - k)
+			want = tt.items[k:]
+			AssertPtrSliceEq(t, want, ptrGot, "TakePtrSlice")
+		})
 	}
 }
 
 func TestIterTakeWhileAndSkip(t *testing.T) {
-	l := New[int]()
-	for i := 1; i <= 5; i++ {
-		l.PushBack(i)
-	}
+	l := listFromRangeIncl(t, 1, 5)
 
 	// TakeWhile should stop at first non-match
-	it := l.Iter()
+	it := l.BidiIter()
 	got := it.TakeWhile(func(v int) bool { return v < 3 })
-	want := []int{1, 2}
-	if !slices.Equal(got, want) {
-		t.Errorf("TakeWhile got %v, want %v", got, want)
-	}
+	AssertSliceEq(t, []int{1, 2}, got, "TakeWhile")
 
 	// TakeWhilePtr should stop at first non-match
-	it = l.Iter()
+	it = l.BidiIter()
 	ptrs := it.TakeWhilePtr(func(p *int) bool { return *p < 4 })
-	if len(ptrs) != 3 || *ptrs[2] != 3 {
-		t.Errorf("TakeWhilePtr got %v, want [1,2,3]", ptrs)
-	}
+	AssertPtrSliceEq(t, []int{1, 2, 3}, ptrs, "TakeWhilePtr")
 
 	// Skip should advance by n
-	it = l.Iter()
+	it = l.BidiIter()
 	it.Skip(2)
 	val, ok := it.Next()
-	if !ok || val != 3 {
-		t.Errorf("Skip(2) then Next = (%d,%v), want (3,true)", val, ok)
-	}
+	AssertEqOk(t, 3, val, ok, "Skip(2) then Next")
 
 	// SkipBack should step back by n
 	it.ResetBack()
 	it.SkipBack(2)
 	val, ok = it.Prev()
-	if !ok || val != 3 {
-		t.Errorf("SkipBack(2) then Prev = (%d,%v), want (3,true)", val, ok)
-	}
+	AssertEqOk(t, 3, val, ok, "SkipBack(2) then Prev")
 
 	// SkipWhile should advance until predicate fails
-	it = l.Iter()
+	it = l.BidiIter()
 	it.SkipWhile(func(v int) bool { return v < 4 })
 	val, ok = it.Next()
-	if !ok || val != 4 {
-		t.Errorf("SkipWhile then Next = (%d,%v), want (4,true)", val, ok)
-	}
+	AssertEqOk(t, 4, val, ok, "SkipWhile then Next")
 
 	// SkipWhilePtr should advance until predicate fails
-	it = l.Iter()
+	it = l.BidiIter()
 	it.SkipWhilePtr(func(p *int) bool { return *p < 5 })
 	val, ok = it.Next()
-	if !ok || val != 5 {
-		t.Errorf("SkipWhilePtr then Next = (%d,%v), want (5,true)", val, ok)
-	}
+	AssertEqOk(t, 5, val, ok, "SkipWhilePtr then Next")
 
 	// DrainWhile should remove items until predicate fails
-	it = l.Iter()
+	it = l.BidiIter()
 	it.DrainWhile(func(v int) bool { return v < 3 })
 	got = l.ToSlice()
-	want = []int{3, 4, 5}
-	if !slices.Equal(got, want) {
-		t.Errorf("DrainWhile modified list to %v, want %v", got, want)
-	}
+	AssertSliceEq(t, []int{3, 4, 5}, got, "DrainWhile modified list as expected")
 
 	// DrainWhilePtr should remove items until predicate fails
-	l = New[int]()
-	for i := 1; i <= 5; i++ {
-		l.PushBack(i)
-	}
-	it = l.Iter()
+	l = listFromRangeIncl(t, 1, 5)
+	it = l.BidiIter()
 	it.DrainWhilePtr(func(p *int) bool { return *p < 4 })
 	got = l.ToSlice()
-	want = []int{4, 5}
-	if !slices.Equal(got, want) {
-		t.Errorf("DrainWhilePtr modified list to %v, want %v", got, want)
-	}
+	AssertSliceEq(t, []int{4, 5}, got, "DrainWhilePtr modified list as expected")
 }
 
 func TestIterTakeSkipEmpty(t *testing.T) {
 	l := New[int]()
-	it := l.Iter()
+	it := l.BidiIter()
 
-	if got := it.TakeSlice(3); len(got) != 0 || got == nil {
-		t.Errorf("TakeSlice on empty list got %v, want []", got)
-	}
-	if got := it.TakePtrSlice(3); len(got) != 0 || got == nil {
-		t.Errorf("TakePtrSlice on empty list got %v, want []", got)
-	}
-	if got := it.TakeWhile(func(v int) bool { return true }); len(got) != 0 || got == nil {
-		t.Errorf("TakeWhile on empty list got %v, want []", got)
-	}
-	if got := it.TakeWhilePtr(func(p *int) bool { return true }); len(got) != 0 || got == nil {
-		t.Errorf("TakeWhilePtr on empty list got %v, want []", got)
-	}
+	AssertSliceEq(t, []int{}, it.TakeSlice(3), "TakeSlice(3)")
+	AssertSliceEq(t, []*int{}, it.TakePtrSlice(3), "TakePtrSlice(3)")
+	AssertSliceEq(t, []int{}, it.TakeWhile(func(v int) bool { return true }), "TakeWhile")
+	AssertSliceEq(t, []*int{}, it.TakeWhilePtr(func(v *int) bool { return true }), "TakeWhilePtr")
 
 	// Skip/SkipBack/SkipWhile/DrainWhile should be safe no-ops
 	it.
@@ -1185,9 +918,9 @@ func TestIterTakeSkipEmpty(t *testing.T) {
 	}).DrainWhilePtr(func(p *int) bool {
 		return true
 	})
-	if got, ok := it.Current(); ok {
-		t.Errorf("Skip SkipBack SkipWhile DrainWhile DrainWhilePtr on empty, got %v, want %v", got, false)
-	}
+	got, ok := it.Current()
+	AssertZeroFalse(t, got, ok,
+		"Skip SkipBack SkipWhile DrainWhile DrainWhilePtr on empty")
 }
 
 func TestDocExample1(t *testing.T) {
@@ -1195,73 +928,48 @@ func TestDocExample1(t *testing.T) {
 	l.Add(2).Add(4)
 	l.PushBack(8)
 	l.PushFront(1)
-	wantStr := "List[1, 2, 4, 8]"
-	if got := l.String(); got != wantStr {
-		t.Errorf("String(), got %v, want %v", got, wantStr)
-	}
+	AssertEq(t, "List[1, 2, 4, 8]", l.String(), "String")
 
-	l = FromSlice[int]([]int{1, 2, 4, 8, 4, 2, 1})
+	l = FromSlice([]int{1, 2, 4, 8, 4, 2, 1})
 	eq := func(a, b int) bool { return a == b }
-	if got := l.IndexOf(2, eq); got != 1 {
-		t.Errorf("IndexOf(2), got %v, want %v", got, 1)
-	}
-	if got := l.LastIndexOf(2, eq); got != 5 {
-		t.Errorf("LastIndexof(2), got %v, want %v", got, 5)
-	}
-	if got := l.IndexOf(65535, eq); got != -1 {
-		t.Errorf("IndexOf(65535), got %v, want %v", got, -1)
-	}
+	AssertEq(t, 1, l.IndexOf(2, eq), "IndexOf(2)")
+	AssertEq(t, 5, l.LastIndexOf(2, eq), "LastIndexof(2)")
+	AssertEq(t, -1, l.IndexOf(65535, eq), "IndexOf(65535)")
 
 	l.Iter().Skip(2).ForEachPtr(func(v *int) bool {
 		*v *= 2
 		return true
 	})
-	wantStr = "List[1, 2, 8, 16, 8, 4, 2]"
-	if s := l.String(); s != wantStr {
-		t.Errorf("String(), got %v, want %v", s, wantStr)
-	}
+	want := []int{1, 2, 8, 16, 8, 4, 2}
+	AssertSliceEq(t, want, l.ToSlice(), "List items doubled with ForEachPtr")
 
-	it := l.Iter()
-	if v, ok := it.Prev(); v != 0 || ok {
-		t.Errorf("Prev() on new iter, got (%v, %v) want (0, false)", v, ok)
-	}
-	if v, ok := it.Peek(); v != 1 || !ok {
-		t.Errorf("Peek() got (%v, %v) want (1, true)", v, ok)
-	}
-	if v, ok := it.Next(); v != 1 || !ok {
-		t.Errorf("Next() got (%v, %v) want (1, true)", v, ok)
-	}
-	if ok := it.InsertBefore(55); !ok {
-		t.Errorf("InsertBefore(55) got %v want true", ok)
-	}
-	if v, ok := it.Prev(); v != 55 || !ok {
-		t.Errorf("Prev() got (%v, %v) want (55, true)", v, ok)
-	}
-	if v, ok := it.Remove(); v != 55 || !ok {
-		t.Errorf("Remove() got (%v, %v) want (55, true)", v, ok)
-	}
-	if v, ok := it.Next(); v != 1 || !ok {
-		t.Errorf("Next() got (%v, %v) want (1, true)", v, ok)
-	}
-	if v, ok := it.PeekBack(); v != 0 || ok {
-		t.Errorf("PeekBack() got (%v, %v) want (0, false)", v, ok)
-	}
+	it := l.BidiIter()
+	v, ok := it.Prev()
+	AssertZeroFalse(t, v, ok, "Prev at head")
+	v, ok = it.Peek()
+	AssertEqOk(t, 1, v, ok, "Peek at head non-empty")
+	v, ok = it.Peek()
+	AssertEqOk(t, 1, v, ok, "Peek at head non-empty, consecutive")
+	v, ok = it.Next()
+	AssertEqOk(t, 1, v, ok, "Next at head non-empty")
+	ok = it.InsertBefore(55)
+	AssertEq(t, true, ok, "InsertBefore first item")
+	v, ok = it.Prev()
+	AssertEqOk(t, 55, v, ok, "Prev at first item after InsertBefore")
+	v, ok = it.Remove()
+	AssertEqOk(t, 55, v, ok, "Remove at value 55")
+	v, ok = it.Next()
+	AssertEqOk(t, 1, v, ok, "Next")
+	v, ok = it.PeekBack()
+	AssertZeroFalse(t, v, ok, "PeekBack at first item")
+	AssertSliceEq(t, want, l.ToSlice(), "ops cancelled each other")
 
-	wantStr = "List[1, 2, 8, 16, 8, 4, 2]"
-	if s := l.String(); s != wantStr {
-		t.Errorf("String(), got %v, want %v", s, wantStr)
-	}
-
-	v, ok := it.ResetBack().PrevPtr()
-	if !ok || *v != 2 {
-		t.Errorf("ResetBack() PrevPtr() got (%v, %v) want (2, true)", v, ok)
-	}
-	*v += 98
+	p, ok := it.ResetBack().PrevPtr()
+	AssertNotNil(t, p)
+	AssertEqOk(t, 2, *p, ok, "ResetBack then PrevPtr")
+	*p += 98
 	it.InsertAfter(42)
-	wantStr = "List[1, 2, 8, 16, 8, 4, 100, 42]"
-	if s := l.String(); s != wantStr {
-		t.Errorf("String(), got %v, want %v", s, wantStr)
-	}
+	AssertSliceEq(t, []int{1, 2, 8, 16, 8, 4, 100, 42}, l.ToSlice(), "ResetBack PrevPtr modified")
 
 	it.Reset().
 		SkipWhile(func(v int) bool {
@@ -1271,13 +979,28 @@ func TestDocExample1(t *testing.T) {
 		DrainWhile(func(v int) bool {
 			return v != 4
 		})
+	AssertSliceEq(t, []int{1, 2, 4, 100, 42}, l.ToSlice(), "State after piped modifications")
+	s := it.Reset().Skip(1).TakeSlice(3)
+	AssertSliceEq(t, []int{2, 4, 100}, s, "State after Reset-Skip-TakeSlice")
+}
 
-	wantSlice := []int{1, 2, 4, 100, 42}
-	if s := l.ToSlice(); !slices.Equal(s, wantSlice) {
-		t.Errorf("String(), got %v, want %v", s, wantSlice)
+// ----- Helpers -----
+func listFromRangeIncl(t *testing.T, from, toIncl int) *List[int] {
+	t.Helper()
+	ValidRangeOrDie(t, from, toIncl)
+	res := New[int]()
+	for i := from; i <= toIncl; i++ {
+		res.PushBack(i)
 	}
-	wantSlice = []int{2, 4, 100}
-	if s := it.Reset().Skip(1).TakeSlice(3); !slices.Equal(s, wantSlice) {
-		t.Errorf("String(), got %v, want %v", s, wantSlice)
+	return res
+}
+
+func listFromRangeExcl(t *testing.T, from, to int) *List[int] {
+	t.Helper()
+	ValidRangeOrDie(t, from, to)
+	res := New[int]()
+	for i := from; i < to; i++ {
+		res.PushBack(i)
 	}
+	return res
 }
