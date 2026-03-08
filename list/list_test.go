@@ -77,10 +77,21 @@ func TestAddAndLen(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	l := New[int]()
+	var l *List[int]
+	AssertEq(t, "nil", l.String())
+	l = New[int]()
 	AssertEq(t, "List[]", l.String())
 	l.Add(1).Add(2).Add(3)
-	AssertEq(t, "List[1, 2, 3]", l.String())
+	AssertEq(t, "List[1 2 3]", l.String())
+}
+
+func TestGoString(t *testing.T) {
+	var l *List[int]
+	AssertEq(t, "nil", l.String())
+	l = New[int]()
+	AssertEq(t, "List[int]{}", fmt.Sprintf("%#v", l))
+	l.Add(1).Add(2).Add(3)
+	AssertEq(t, "List[int]{1, 2, 3}", fmt.Sprintf("%#v", l))
 }
 
 func TestEquals(t *testing.T) {
@@ -928,7 +939,7 @@ func TestDocExample1(t *testing.T) {
 	l.Add(2).Add(4)
 	l.PushBack(8)
 	l.PushFront(1)
-	AssertEq(t, "List[1, 2, 4, 8]", l.String(), "String")
+	AssertEq(t, "List[1 2 4 8]", l.String(), "String")
 
 	l = FromSlice([]int{1, 2, 4, 8, 4, 2, 1})
 	eq := func(a, b int) bool { return a == b }

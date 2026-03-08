@@ -39,7 +39,7 @@ func main() {
 		*v *= 2
 		return true
 	})
-	l.String() // -> List[1, 2, 8, 16, 8, 4, 2]
+	l.String() // -> List[1 2 8 16 8 4 2]
 
 	it := l.BidiIter()
 	v, ok := v.Prev() // -> 0, false
@@ -51,13 +51,13 @@ func main() {
 	v, ok = it.Next() // -> 1, true
 	v, ok = it.PeekBack() // 0, false
 
-	l.String() // -> List[1, 2, 8, 16, 8, 4, 2]
+	l.String() // -> List[1 2 8 16 8 4 2]
 
 	v, ok = it.ResetBack().PrevPtr() // -> int* pointing to 2, ok
 	*v += 98
 	v, ok = it.Current() // -> 100, true
 	ok = it.InsertAfter(42)
-	l.String() // -> List[1, 2, 8, 16, 8, 4, 100, 42]
+	l.String() // -> List[1 2 8 16 8 4 100 42]
 
 	it.Reset() // -> move to head
 		SkipWhile(func(v int) bool {
@@ -65,10 +65,10 @@ func main() {
 		}).  // it.Next() would return 16 here
 		SkipBack(1). // now it.Next() would return 8
 		DrainWhile(func(v int) bool {
-			return v != 4 // skip over [8, 16, 8]
+			return v != 4 // skip over [8 16 8]
 		})
-	slice1 := l.ToSlice() // [1, 2, 4, 100, 42]
-	slice2 := it.Reset().Skip(1).TakeSlice(3) // [2, 4, 100]
+	slice1 := l.ToSlice() // [1 2 4 100 42]
+	slice2 := it.Reset().Skip(1).TakeSlice(3) // [2 4 100]
 }
 ```
 See more in the documentation.

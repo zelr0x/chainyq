@@ -119,7 +119,7 @@ func (l *List[T]) IsEmpty() bool {
 	return l.len == 0
 }
 
-// String is a Stringer implementation.
+// String implements fmt.Stringer, used for %v and %+v.
 func (l *List[T]) String() string {
 	if l == nil {
 		return "nil"
@@ -135,10 +135,33 @@ func (l *List[T]) String() string {
 		if !it.HasNext() {
 			break
 		}
-		sb.WriteString(", ")
+		sb.WriteString(" ")
 	}
 	sb.WriteRune(']')
 	return sb.String()
+}
+
+// GoString implements fmt.GoStringer, used for %#v.
+func (l *List[T]) GoString() string {
+    if l == nil {
+        return "nil"
+    }
+	var zero T
+    if l.len == 0 {
+        return fmt.Sprintf("List[%T]{}", zero)
+    }
+    var sb strings.Builder
+    fmt.Fprintf(&sb, "List[%T]{", zero)
+    it := l.Iter()
+    for v, ok := it.Next(); ok; v, ok = it.Next() {
+        fmt.Fprintf(&sb, "%#v", v)
+        if !it.HasNext() {
+            break
+        }
+        sb.WriteString(", ")
+    }
+    sb.WriteRune('}')
+    return sb.String()
 }
 
 // Equals returns true if this list is element-wise equal to the specified list
