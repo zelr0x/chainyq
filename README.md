@@ -4,6 +4,10 @@
 
 Chainyq provides generic lists and queues with a rich, flexible API. Written in pure Go with zero dependencies.
 
+All methods have pointer receivers and are designed to fail fast - they will panic
+if called on a nil pointer. This eliminates the need for redundant nil checks in most cases
+and helps detect bugs early. Free functions that accept pointers tolerate nil, but methods do not.
+
 ## List
 `list.List` is a doubly-linked list that can do all the operations you expect from a linked list and more. The list is not safe for concurrent use.
 ```go

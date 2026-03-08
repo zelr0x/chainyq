@@ -75,11 +75,18 @@ type node[T any] struct {
 
 // New creates a new List.
 func New[T any]() *List[T] {
+	res := NewValue[T]()
+	return &res
+}
+
+// NewValue returns an initialized List value. It can be useful for embedding
+// or advanced use cases. Most users should prefer New().
+func NewValue[T any]() List[T] {
 	head := new(node[T])
 	tail := new(node[T])
 	head.next = tail
 	tail.prev = head
-	return &List[T]{head: head, tail: tail}
+	return List[T]{head: head, tail: tail}
 }
 
 // FromSlice creates a new list from the specified slice.
@@ -292,7 +299,7 @@ func (l *List[T]) Remove(idx int) bool {
 // in the list, starting search at the front (head) of the list.
 // eq is a function that checks if two items are equal.
 func (l *List[T]) IndexOf(target T, eq func(T, T) bool) int {
-	if Len(l) < 1 {
+	if l.len < 1 {
 		return -1
 	}
 	it := l.Iter()
@@ -310,7 +317,7 @@ func (l *List[T]) IndexOf(target T, eq func(T, T) bool) int {
 // in the list, starting search at the back (tail) of the list.
 // eq is a function that checks if two items are equal.
 func (l *List[T]) LastIndexOf(target T, eq func(T, T) bool) int {
-	if Len(l) < 1 {
+	if l.len < 1 {
 		return -1
 	}
 	it := l.RevIter()
