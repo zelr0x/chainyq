@@ -164,13 +164,18 @@ func (l *List[T]) GoString() string {
     return sb.String()
 }
 
-// Equals returns true if this list is element-wise equal to the specified list
-// according to the specified equality function, false otherwise.
+// Equals returns true if both lists are nil or this list
+// is element-wise equal to the specified list according to the specified
+// equality function, false otherwise. Empty list is not equal to nil list.
 func (l *List[T]) Equals(other *List[T], eq func(T, T) bool) bool {
-	if l.len != other.len {
+	switch {
+	case l == nil:
+		return other == nil
+	case other == nil:
 		return false
-	}
-	if l.len == 0 {
+	case l.len != other.len:
+		return false
+	case l.len == 0:
 		return true
 	}
 	itA := l.Iter()

@@ -98,20 +98,21 @@ func TestEquals(t *testing.T) {
 	eq := func(a, b int) bool { return a == b }
 	tests := []struct {
 		name string
-		a    []int
-		b    []int
+		a    *List[int]
+		b    *List[int]
 		want bool
 	}{
-		{"both empty", []int{}, []int{}, true},
-		{"same elements", []int{1, 2, 3}, []int{1, 2, 3}, true},
-		{"different lengths", []int{1, 2}, []int{1, 2, 3}, false},
-		{"different elements", []int{1, 2, 3}, []int{1, 2, 4}, false},
+		{"both nil", nil, nil, true},
+		{"lhs nil rhs empty", nil, FromSlice([]int{}), false},
+		{"lhs empty rhs nil", FromSlice([]int{}), nil, false},
+		{"both empty", FromSlice([]int{}), FromSlice([]int{}), true},
+		{"same elements", FromSlice([]int{1, 2, 3}), FromSlice([]int{1, 2, 3}), true},
+		{"different lengths", FromSlice([]int{1, 2}), FromSlice([]int{1, 2, 3}), false},
+		{"different elements", FromSlice([]int{1, 2, 3}), FromSlice([]int{1, 2, 4}), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l1 := FromSlice(tt.a)
-			l2 := FromSlice(tt.b)
-			AssertEq(t, tt.want, l1.Equals(l2, eq))
+			AssertEq(t, tt.want, tt.a.Equals(tt.b, eq))
 		})
 	}
 }
