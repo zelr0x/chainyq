@@ -8,6 +8,12 @@ All methods have pointer receivers and are designed to fail fast - they will pan
 if called on a nil pointer. This eliminates the need for redundant nil checks in most cases
 and helps detect bugs early. Free functions that accept pointers tolerate nil, but methods do not.
 
+Data structures in this library are designed to avoid dynamic dispatch wherever possible.
+The only exception is `Seq` which is inherently dynamic.
+If you really need interfaces, you can find general interfaces in the root package (`chainyq`).
+Implementation-specific interfaces are located in their respective packages.
+
+
 ## List
 `list.List` is a doubly-linked list that can do all the operations you expect from a linked list and more. The list is not safe for concurrent use.
 ```go
@@ -106,4 +112,28 @@ See docs for the full list of available operations.
 (it *Iter[T]) PtrSeq() seq.Seq[*T]
 (it *RevIter[T]) Seq() seq.Seq[T]
 (it *RevIter[T]) PtrSeq() seq.Seq[*T]
+```
+
+## ListDeque
+
+`list.List` is already a deque, but if you need a restricted API focused only on deque operations,
+you can use `deque.listdeque.ListDeque` which implements only this interface (and `String`/`GoString` for debugging):
+```go
+type Deque[T any] interface {
+    Collection[T]
+    
+    PushBack(T)
+    PopBack() (T, bool)
+    Back() (T, bool)
+    
+    PushFront(T)
+    PopFront() (T, bool)
+    Front() (T, bool)
+}
+```
+It is recommended to use a named import for convenience:
+```go
+import (
+	deque "github.com/zelr0x/chainyq/deque/listdeque"
+)
 ```
