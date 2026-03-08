@@ -78,9 +78,6 @@ See more in the documentation.
 i.e. `func(v T) bool`:
 ```go
 import (
-	"fmt"
-
-	"github.com/zelr0x/chainyq/list"
 	"github.com/zelr0x/chainyq/seq"
 )
 
@@ -95,6 +92,8 @@ func main() {
 ```
 Operations that leave the sequence's element type unchanged are defined as methods on `seq.Seq`.
 Operations that transform the element type are provided as functions in the `seq` package.
+
+See docs for the full list of available operations.
 
 
 `list.List[T]`'s iterators can be converted to sequences with the following methods:
