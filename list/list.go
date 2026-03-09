@@ -375,7 +375,7 @@ func (l *List[T]) RemoveIf(pred func(T) bool) int {
 // Concat appends all elements of 'other' to this list in O(1) by splicing
 // nodes. After this call, 'other' is emptied and must not be used.
 func (l *List[T]) Concat(other *List[T]) {
-	if other.IsEmpty() {
+	if Len(other) == 0 {
 		return
 	}
 	if l.IsEmpty() {
