@@ -146,7 +146,7 @@ func TestFrontAndBack(t *testing.T) {
 
 func TestFrontPtrAndBackPtr(t *testing.T) {
 	l := New[int]()
-	
+
 	got, ok := l.FrontPtr()
 	AssertZeroFalse(t, got, ok)
 	got, ok = l.BackPtr()
@@ -251,20 +251,22 @@ func TestRemove(t *testing.T) {
 		name       string
 		initial    []int
 		idx        int
+		wantVal    int
 		wantOK     bool
 		wantResult []int
 	}{
-		{"remove front", []int{1, 2, 3}, 0, true, []int{2, 3}},
-		{"remove middle", []int{1, 2, 3}, 1, true, []int{1, 3}},
-		{"remove back", []int{1, 2, 3}, 2, true, []int{1, 2}},
-		{"remove out of range negative", []int{1, 2}, -1, false, []int{1, 2}},
-		{"remove out of range too large", []int{1, 2}, 5, false, []int{1, 2}},
-		{"remove from empty", []int{}, 0, false, []int{}},
+		{"remove front", []int{1, 2, 3}, 0, 1, true, []int{2, 3}},
+		{"remove middle", []int{1, 2, 3}, 1, 2, true, []int{1, 3}},
+		{"remove back", []int{1, 2, 3}, 2, 3, true, []int{1, 2}},
+		{"remove out of range negative", []int{1, 2}, -1, 0, false, []int{1, 2}},
+		{"remove out of range too large", []int{1, 2}, 5, 0, false, []int{1, 2}},
+		{"remove from empty", []int{}, 0, 0, false, []int{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := FromSlice(tt.initial)
-			ok := l.Remove(tt.idx)
+			val, ok := l.Remove(tt.idx)
+			AssertEq(t, tt.wantVal, val)
 			AssertEq(t, tt.wantOK, ok)
 			got := l.ToSlice()
 			AssertSliceEq(t, tt.wantResult, got)
@@ -280,20 +282,23 @@ func TestInsertAndRemoveLarge(t *testing.T) {
 	AssertTrue(t, l.Insert(size/2, 999), "Insert at middle")
 	AssertEq(t, size+1, l.Len(), "length changed after insert")
 
-	val, ok := l.Get(size/2)
+	val, ok := l.Get(size / 2)
 	AssertEqOk(t, 999, val, ok, "get inserted in middle returns expected value")
 
 	// Remove from the middle
-	AssertTrue(t, l.Remove(size/2), "Remove at middle")
+	val, ok = l.Remove(size/2)
+	AssertEqOk(t, 999, val, ok, "Remove at middle")
 	AssertEq(t, size, l.Len(), "size after Remove")
 
-	val, ok = l.Get(size/2)
+	val, ok = l.Get(size / 2)
 	AssertTrue(t, ok)
 	AssertNotEq(t, 999, val, "value 999 should have been removed")
-	
-	AssertTrue(t, l.Remove(0), "Remove first item")
+
+	val, ok = l.Remove(0)
+	AssertEqOk(t, 0, val, ok, "Remove first item")
 	AssertEq(t, size-1, l.Len(), "Len after one item removed")
-	AssertTrue(t, l.Remove(l.Len()-1), "Remove last item")
+	val, ok = l.Remove(l.Len()-1)
+	AssertEqOk(t, 149, val, ok, "Remove last item")
 	AssertEq(t, size-2, l.Len(), "Len after two items removed")
 }
 

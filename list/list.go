@@ -285,14 +285,14 @@ func (l *List[T]) Insert(idx int, val T) bool {
 }
 
 // Remove removes the item with a given index from the list and returns
-// true if found, false otherwise.
-func (l *List[T]) Remove(idx int) bool {
+// that item and true if the index is valid, zero and false otherwise.
+func (l *List[T]) Remove(idx int) (T, bool) {
 	n := l.nodeAt(idx)
 	if n == nil {
-		return false
+		var zero T
+		return zero, false
 	}
-	l.remove(n)
-	return true
+	return l.remove(n)
 }
 
 // IndexOf returns the index of the first occurrence of a target
