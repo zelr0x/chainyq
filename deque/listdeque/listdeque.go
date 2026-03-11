@@ -56,6 +56,7 @@ func (d *ListDeque[T]) String() string {
 		return "ListDeque[]"
 	}
 	var sb strings.Builder
+	sb.Grow(11 + 2*d.l.Len())
 	sb.WriteString("ListDeque[")
 	it := d.l.Iter()
 	for v, ok := it.Next(); ok; v, ok = it.Next() {
@@ -79,6 +80,7 @@ func (d *ListDeque[T]) GoString() string {
         return fmt.Sprintf("ListDeque[%T]{}", zero)
     }
     var sb strings.Builder
+	sb.Grow(32 + 3*d.l.Len())
     fmt.Fprintf(&sb, "ListDeque[%T]{", zero)
     it := d.l.Iter()
     for v, ok := it.Next(); ok; v, ok = it.Next() {

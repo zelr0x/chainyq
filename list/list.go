@@ -125,6 +125,7 @@ func (l *List[T]) String() string {
 		return "List[]"
 	}
 	var sb strings.Builder
+	sb.Grow(6+2*l.len)
 	sb.WriteString("List[")
 	it := l.Iter()
 	for v, ok := it.Next(); ok; v, ok = it.Next() {
@@ -148,6 +149,7 @@ func (l *List[T]) GoString() string {
         return fmt.Sprintf("List[%T]{}", zero)
     }
     var sb strings.Builder
+	sb.Grow(32 + 3*l.len)
     fmt.Fprintf(&sb, "List[%T]{", zero)
     it := l.Iter()
     for v, ok := it.Next(); ok; v, ok = it.Next() {

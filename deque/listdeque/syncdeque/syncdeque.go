@@ -58,6 +58,7 @@ func (d *SyncListDeque[T]) String() string {
 		return "SyncListDeque[]"
 	}
 	var sb strings.Builder
+	sb.Grow(15 + 2*d.l.Len())
 	sb.WriteString("SyncListDeque[")
 	it := d.l.Iter()
 	for v, ok := it.Next(); ok; v, ok = it.Next() {
@@ -83,6 +84,7 @@ func (d *SyncListDeque[T]) GoString() string {
         return fmt.Sprintf("SyncListDeque[%T]{}", zero)
     }
     var sb strings.Builder
+	sb.Grow(32 + 3*d.l.Len())
     fmt.Fprintf(&sb, "SyncListDeque[%T]{", zero)
     it := d.l.Iter()
     for v, ok := it.Next(); ok; v, ok = it.Next() {
