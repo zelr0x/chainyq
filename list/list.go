@@ -23,8 +23,7 @@ import (
 	"github.com/zelr0x/chainyq/seq"
 )
 
-// TODO: accept config that defines allocation sizes
-const sliceResultCap = 32
+const takeWhileInitCap = 32
 
 // List is a doubly-linked list. Not thread-safe.
 type List[T any] struct {
@@ -910,7 +909,7 @@ func (it *RevIter[T]) TakeWhile(pred func(T) bool) []T {
 	if !it.HasNext() {
 		return []T{}
 	}
-	res := make([]T, 0, min(it.b.l.len, sliceResultCap))
+	res := make([]T, 0, min(it.b.l.len, takeWhileInitCap))
 	for v, ok := it.Peek(); ok && pred(v); v, ok = it.Peek() {
 		res = append(res, v)
 		_, _ = it.Next()
@@ -928,7 +927,7 @@ func (it *RevIter[T]) TakeWhilePtr(pred func(*T) bool) []*T {
 	if !it.HasNext() {
 		return []*T{}
 	}
-	res := make([]*T, 0, min(it.b.l.len, sliceResultCap))
+	res := make([]*T, 0, min(it.b.l.len, takeWhileInitCap))
 	for v, ok := it.PeekPtr(); ok && pred(v); v, ok = it.PeekPtr() {
 		res = append(res, v)
 		_, _ = it.Next()
@@ -1282,7 +1281,7 @@ func (it *BidiIter[T]) TakeWhile(pred func(T) bool) []T {
 	if !it.HasNext() {
 		return []T{}
 	}
-	res := make([]T, 0, min(it.l.len, sliceResultCap))
+	res := make([]T, 0, min(it.l.len, takeWhileInitCap))
 	for v, ok := it.Peek(); ok && pred(v); v, ok = it.Peek() {
 		res = append(res, v)
 		it.advance()
@@ -1300,7 +1299,7 @@ func (it *BidiIter[T]) TakeWhilePtr(pred func(*T) bool) []*T {
 	if !it.HasNext() {
 		return []*T{}
 	}
-	res := make([]*T, 0, min(it.l.len, sliceResultCap))
+	res := make([]*T, 0, min(it.l.len, takeWhileInitCap))
 	for v, ok := it.PeekPtr(); ok && pred(v); v, ok = it.PeekPtr() {
 		res = append(res, v)
 		it.advance()
