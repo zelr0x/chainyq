@@ -72,26 +72,26 @@ func (d *ListDeque[T]) String() string {
 
 // GoString implements fmt.GoStringer, used for %#v.
 func (d *ListDeque[T]) GoString() string {
-    if d == nil {
-        return "nil"
-    }
+	if d == nil {
+		return "nil"
+	}
 	var zero T
-    if d.l.Len() == 0 {
-        return fmt.Sprintf("ListDeque[%T]{}", zero)
-    }
-    var sb strings.Builder
+	if d.l.Len() == 0 {
+		return fmt.Sprintf("ListDeque[%T]{}", zero)
+	}
+	var sb strings.Builder
 	sb.Grow(32 + 3*d.l.Len())
-    fmt.Fprintf(&sb, "ListDeque[%T]{", zero)
-    it := d.l.Iter()
-    for v, ok := it.Next(); ok; v, ok = it.Next() {
-        fmt.Fprintf(&sb, "%#v", v)
-        if !it.HasNext() {
-            break
-        }
-        sb.WriteString(", ")
-    }
-    sb.WriteRune('}')
-    return sb.String()
+	fmt.Fprintf(&sb, "ListDeque[%T]{", zero)
+	it := d.l.Iter()
+	for v, ok := it.Next(); ok; v, ok = it.Next() {
+		fmt.Fprintf(&sb, "%#v", v)
+		if !it.HasNext() {
+			break
+		}
+		sb.WriteString(", ")
+	}
+	sb.WriteRune('}')
+	return sb.String()
 }
 
 // Len returns the number of items in the deque.

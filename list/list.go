@@ -53,18 +53,18 @@ type RevIter[T any] struct {
 // Not that most methods of Iter and BidiIter behave similarly, while
 // RevIter's methods work in the opposite direction.
 type ListIterator[T any] interface {
-    chainyq.CursorIterator[T]
-    chainyq.Sequencer[T]
+	chainyq.CursorIterator[T]
+	chainyq.Sequencer[T]
 	Insert(val T) bool
-    Remove() (T, bool)
-    ForEach(f func(T) bool)
-    ForEachPtr(f func(*T) bool)
-    ToChan(size int) <-chan T
-    ToPtrChan(size int) <-chan *T
-    TakeSlice(n int) []T
-    TakePtrSlice(n int) []*T
-    TakeWhile(pred func(T) bool) []T
-    TakeWhilePtr(pred func(*T) bool) []*T
+	Remove() (T, bool)
+	ForEach(f func(T) bool)
+	ForEachPtr(f func(*T) bool)
+	ToChan(size int) <-chan T
+	ToPtrChan(size int) <-chan *T
+	TakeSlice(n int) []T
+	TakePtrSlice(n int) []*T
+	TakeWhile(pred func(T) bool) []T
+	TakeWhilePtr(pred func(*T) bool) []*T
 }
 
 type node[T any] struct {
@@ -125,7 +125,7 @@ func (l *List[T]) String() string {
 		return "List[]"
 	}
 	var sb strings.Builder
-	sb.Grow(6+2*l.len)
+	sb.Grow(6 + 2*l.len)
 	sb.WriteString("List[")
 	it := l.Iter()
 	for v, ok := it.Next(); ok; v, ok = it.Next() {
@@ -141,26 +141,26 @@ func (l *List[T]) String() string {
 
 // GoString implements fmt.GoStringer, used for %#v.
 func (l *List[T]) GoString() string {
-    if l == nil {
-        return "nil"
-    }
+	if l == nil {
+		return "nil"
+	}
 	var zero T
-    if l.len == 0 {
-        return fmt.Sprintf("List[%T]{}", zero)
-    }
-    var sb strings.Builder
+	if l.len == 0 {
+		return fmt.Sprintf("List[%T]{}", zero)
+	}
+	var sb strings.Builder
 	sb.Grow(32 + 3*l.len)
-    fmt.Fprintf(&sb, "List[%T]{", zero)
-    it := l.Iter()
-    for v, ok := it.Next(); ok; v, ok = it.Next() {
-        fmt.Fprintf(&sb, "%#v", v)
-        if !it.HasNext() {
-            break
-        }
-        sb.WriteString(", ")
-    }
-    sb.WriteRune('}')
-    return sb.String()
+	fmt.Fprintf(&sb, "List[%T]{", zero)
+	it := l.Iter()
+	for v, ok := it.Next(); ok; v, ok = it.Next() {
+		fmt.Fprintf(&sb, "%#v", v)
+		if !it.HasNext() {
+			break
+		}
+		sb.WriteString(", ")
+	}
+	sb.WriteRune('}')
+	return sb.String()
 }
 
 // Equals returns true if both lists are nil or this list
@@ -441,7 +441,7 @@ func (l *List[T]) Slice(start, end int) []T {
 	if 2*start >= l.len {
 		// +1 is needed because without it after skipping back, the current
 		// will be the first item that we need to take, but next() will skip it.
-		return l.BidiIter().ResetBack().SkipBack(l.len-start+1).TakeSlice(n)
+		return l.BidiIter().ResetBack().SkipBack(l.len - start + 1).TakeSlice(n)
 	}
 	return l.Iter().Skip(start).TakeSlice(n)
 }
@@ -728,7 +728,6 @@ func (it *Iter[T]) PtrSeq() seq.Seq[*T] {
 	return seq.New(it.NextPtr)
 }
 
-
 // ----- RevIter -----
 
 // Clone creates a new reverse iterator to the same underlying list,
@@ -1000,7 +999,6 @@ func (it *RevIter[T]) Seq() seq.Seq[T] {
 func (it *RevIter[T]) PtrSeq() seq.Seq[*T] {
 	return seq.New(it.NextPtr)
 }
-
 
 // ----- BidiIter -----
 

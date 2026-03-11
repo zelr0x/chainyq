@@ -310,7 +310,7 @@ func TestInsertAndRemoveLarge(t *testing.T) {
 	AssertEqOk(t, 999, val, ok, "get inserted in middle returns expected value")
 
 	// Remove from the middle
-	val, ok = l.Remove(size/2)
+	val, ok = l.Remove(size / 2)
 	AssertEqOk(t, 999, val, ok, "Remove at middle")
 	AssertEq(t, size, l.Len(), "size after Remove")
 
@@ -321,7 +321,7 @@ func TestInsertAndRemoveLarge(t *testing.T) {
 	val, ok = l.Remove(0)
 	AssertEqOk(t, 0, val, ok, "Remove first item")
 	AssertEq(t, size-1, l.Len(), "Len after one item removed")
-	val, ok = l.Remove(l.Len()-1)
+	val, ok = l.Remove(l.Len() - 1)
 	AssertEqOk(t, 149, val, ok, "Remove last item")
 	AssertEq(t, size-2, l.Len(), "Len after two items removed")
 }

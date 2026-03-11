@@ -28,7 +28,7 @@ import (
 // because the embedded mutex would be copied and no longer
 // protect the same state. Always use *SyncListDeque.
 type SyncListDeque[T any] struct {
-	l list.List[T]
+	l  list.List[T]
 	mu sync.RWMutex
 }
 
@@ -74,28 +74,28 @@ func (d *SyncListDeque[T]) String() string {
 
 // GoString implements fmt.GoStringer, used for %#v.
 func (d *SyncListDeque[T]) GoString() string {
-    if d == nil {
-        return "nil"
-    }
+	if d == nil {
+		return "nil"
+	}
 	var zero T
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-    if d.l.Len() == 0 {
-        return fmt.Sprintf("SyncListDeque[%T]{}", zero)
-    }
-    var sb strings.Builder
+	if d.l.Len() == 0 {
+		return fmt.Sprintf("SyncListDeque[%T]{}", zero)
+	}
+	var sb strings.Builder
 	sb.Grow(32 + 3*d.l.Len())
-    fmt.Fprintf(&sb, "SyncListDeque[%T]{", zero)
-    it := d.l.Iter()
-    for v, ok := it.Next(); ok; v, ok = it.Next() {
-        fmt.Fprintf(&sb, "%#v", v)
-        if !it.HasNext() {
-            break
-        }
-        sb.WriteString(", ")
-    }
-    sb.WriteRune('}')
-    return sb.String()
+	fmt.Fprintf(&sb, "SyncListDeque[%T]{", zero)
+	it := d.l.Iter()
+	for v, ok := it.Next(); ok; v, ok = it.Next() {
+		fmt.Fprintf(&sb, "%#v", v)
+		if !it.HasNext() {
+			break
+		}
+		sb.WriteString(", ")
+	}
+	sb.WriteRune('}')
+	return sb.String()
 }
 
 // Len returns the number of items in the deque.

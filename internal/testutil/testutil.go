@@ -179,18 +179,18 @@ func AssertPtrSliceEq[T comparable](
 	t.Helper()
 	if len(got) != len(want) {
 		if len(msg) > 0 {
-            t.Errorf("%s (len): want %v, got %v", msg[0], len(want), len(got))
-        } else {
-            t.Errorf("(len): want %v, got %v", len(want), len(got))
-        }
+			t.Errorf("%s (len): want %v, got %v", msg[0], len(want), len(got))
+		} else {
+			t.Errorf("(len): want %v, got %v", len(want), len(got))
+		}
 	}
 	deref := DerefSlice(t, got)
 	if !slices.Equal(deref, want) {
 		if len(msg) > 0 {
 			t.Errorf("%s: want %v, got %v", msg[0], want, deref)
-        } else {
-            t.Errorf("want %v, got %v", want, deref)
-        }
+		} else {
+			t.Errorf("want %v, got %v", want, deref)
+		}
 	}
 }
 

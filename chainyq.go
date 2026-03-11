@@ -24,44 +24,44 @@ package chainyq
 import "github.com/zelr0x/chainyq/seq"
 
 type Collection[T any] interface {
-    Len() int
-    IsEmpty() bool
+	Len() int
+	IsEmpty() bool
 }
 
 type Deque[T any] interface {
-    Collection[T]
-    
-    PushBack(T)
-    PopBack() (T, bool)
-    Back() (T, bool)
-    
-    PushFront(T)
-    PopFront() (T, bool)
-    Front() (T, bool)
+	Collection[T]
+
+	PushBack(T)
+	PopBack() (T, bool)
+	Back() (T, bool)
+
+	PushFront(T)
+	PopFront() (T, bool)
+	Front() (T, bool)
 }
 
 type Nexter[T any] interface {
-    Next() (T, bool)
+	Next() (T, bool)
 }
 
 type Peeker[T any] interface {
-    Peek() (T, bool)
-    HasNext() bool
+	Peek() (T, bool)
+	HasNext() bool
 }
 
 type Iterator[T any] interface {
-    Nexter[T]
-    NextPtr() (*T, bool)
-    Peeker[T]
+	Nexter[T]
+	NextPtr() (*T, bool)
+	Peeker[T]
 }
 
 type CursorIterator[T any] interface {
-    Iterator[T]
-    Current() (T, bool)
-    CurrentPtr() (*T, bool)
+	Iterator[T]
+	Current() (T, bool)
+	CurrentPtr() (*T, bool)
 }
 
 type Sequencer[T any] interface {
-    Seq() seq.Seq[T]
-    PtrSeq() seq.Seq[*T]
+	Seq() seq.Seq[T]
+	PtrSeq() seq.Seq[*T]
 }

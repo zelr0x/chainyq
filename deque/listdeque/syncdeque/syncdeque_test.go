@@ -23,50 +23,50 @@ import (
 
 // go test -race -timeout 30s -run ^TestConcurrentAccess
 func TestConcurrentAccess(t *testing.T) {
-    d := deque.New[int]()
-    const N = 10000
+	d := deque.New[int]()
+	const N = 10000
 
-    // PopFront + PushBack
-    g1 := func() {
-        for i := 0; i < N; i++ {
-            if v, ok := d.PopFront(); ok {
-                d.PushBack(v)
-            } else {
-                d.PushBack(i)
-            }
-        }
-    }
+	// PopFront + PushBack
+	g1 := func() {
+		for i := 0; i < N; i++ {
+			if v, ok := d.PopFront(); ok {
+				d.PushBack(v)
+			} else {
+				d.PushBack(i)
+			}
+		}
+	}
 
-    // PopBack + PushFront
-    g2 := func() {
-        for i := 0; i < N; i++ {
-            if v, ok := d.PopBack(); ok {
-                d.PushFront(v)
-            } else {
-                d.PushFront(i)
-            }
-        }
-    }
+	// PopBack + PushFront
+	g2 := func() {
+		for i := 0; i < N; i++ {
+			if v, ok := d.PopBack(); ok {
+				d.PushFront(v)
+			} else {
+				d.PushFront(i)
+			}
+		}
+	}
 
-    // Reads
-    g3 := func() {
-        for i := 0; i < N; i++ {
-            _ = d.Len()
-            _ = d.IsEmpty()
-            d.Front()
-            d.Back()
-        }
-    }
+	// Reads
+	g3 := func() {
+		for i := 0; i < N; i++ {
+			_ = d.Len()
+			_ = d.IsEmpty()
+			d.Front()
+			d.Back()
+		}
+	}
 
-    done := make(chan struct{})
-    go func() { g1(); close(done) }()
-    go g2()
-    go g3()
+	done := make(chan struct{})
+	go func() { g1(); close(done) }()
+	go g2()
+	go g3()
 
-    select {
-    case <-done:
-        // success — one goroutine finished, others still running
-    case <-time.After(5 * time.Second):
-        t.Fatal("possible deadlock or hang")
-    }
+	select {
+	case <-done:
+		// success — one goroutine finished, others still running
+	case <-time.After(5 * time.Second):
+		t.Fatal("possible deadlock or hang")
+	}
 }
