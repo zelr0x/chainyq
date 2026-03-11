@@ -24,7 +24,7 @@ import (
 )
 
 // TODO: accept config that defines allocation sizes
-var sliceResultCap int = 32
+const sliceResultCap = 32
 
 // List is a doubly-linked list. Not thread-safe.
 type List[T any] struct {
@@ -268,6 +268,17 @@ func (l *List[T]) PopBack() (T, bool) {
 	return l.remove(l.tail.prev)
 }
 
+// Get retrieves an item by index, returning an item and true if found,
+// zero value and false otherwise.
+func (l *List[T]) Get(idx int) (T, bool) {
+	n := l.nodeAt(idx)
+	if n == nil {
+		var zero T
+		return zero, false
+	}
+	return n.val, true
+}
+
 // Insert adds an item at the specified index if possible, returning
 // true on success or false otherwise.
 func (l *List[T]) Insert(idx int, val T) bool {
@@ -335,17 +346,6 @@ func (l *List[T]) LastIndexOf(target T, eq func(T, T) bool) int {
 // eq is a function that checks if two items are equal.
 func (l *List[T]) Contains(target T, eq func(T, T) bool) bool {
 	return l.IndexOf(target, eq) != -1
-}
-
-// Get retrieves an item by index, returning an item and true if found,
-// zero value and false otherwise.
-func (l *List[T]) Get(idx int) (T, bool) {
-	n := l.nodeAt(idx)
-	if n == nil {
-		var zero T
-		return zero, false
-	}
-	return n.val, true
 }
 
 // ForEach calls the specified function for each item.

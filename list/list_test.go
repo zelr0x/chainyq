@@ -220,6 +220,30 @@ func TestPopBack(t *testing.T) {
 	}
 }
 
+func TestGet(t *testing.T) {
+	tests := []struct {
+		name    string
+		values  []int
+		idx     int
+		wantVal int
+		wantOK  bool
+	}{
+		{"empty list", []int{}, 0, 0, false},
+		{"negative index", []int{1, 2, 3}, -1, 0, false},
+		{"index too large", []int{1, 2, 3}, 5, 0, false},
+		{"get front", []int{1, 2, 3}, 0, 1, true},
+		{"get middle", []int{1, 2, 3}, 1, 2, true},
+		{"get back", []int{1, 2, 3}, 2, 3, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := FromSlice(tt.values)
+			gotVal, gotOK := l.Get(tt.idx)
+			AssertCommaOk(t, tt.wantVal, tt.wantOK, gotVal, gotOK, fmt.Sprintf("Get(%d)", tt.idx))
+		})
+	}
+}
+
 func TestInsert(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -370,30 +394,6 @@ func TestContains(t *testing.T) {
 			l := FromSlice(tt.values)
 			got := l.Contains(tt.target, eq)
 			AssertEq(t, tt.want, got, fmt.Sprintf("Contains(%d)", tt.target))
-		})
-	}
-}
-
-func TestGet(t *testing.T) {
-	tests := []struct {
-		name    string
-		values  []int
-		idx     int
-		wantVal int
-		wantOK  bool
-	}{
-		{"empty list", []int{}, 0, 0, false},
-		{"negative index", []int{1, 2, 3}, -1, 0, false},
-		{"index too large", []int{1, 2, 3}, 5, 0, false},
-		{"get front", []int{1, 2, 3}, 0, 1, true},
-		{"get middle", []int{1, 2, 3}, 1, 2, true},
-		{"get back", []int{1, 2, 3}, 2, 3, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			l := FromSlice(tt.values)
-			gotVal, gotOK := l.Get(tt.idx)
-			AssertCommaOk(t, tt.wantVal, tt.wantOK, gotVal, gotOK, fmt.Sprintf("Get(%d)", tt.idx))
 		})
 	}
 }
