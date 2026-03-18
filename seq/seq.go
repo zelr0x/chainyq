@@ -11,6 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Package seq defines a lazy sequence that is also often called a stream
+// or an iterator. Most operations are defined as methods, but some have
+// to be defined as free functions, primarily due to go's generic limitations.
 package seq
 
 // Seq is a lazy iterator over a potentially infinite sequence of values.
