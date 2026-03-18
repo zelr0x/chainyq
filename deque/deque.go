@@ -716,7 +716,7 @@ func (d *Deque[T]) BidiIter() *BidiIter[T] {
 // On success, the length of the resulting slice is min(Len(), end-start).
 // Returns an empty slice if the range is invalid.
 func (d *Deque[T]) Slice(start, end int) []T {
-	if start >= d.len || start < 0 || end < 1 {
+	if start >= d.len || start < 0 {
 		return []T{}
 	}
 	n := end - start
@@ -724,9 +724,7 @@ func (d *Deque[T]) Slice(start, end int) []T {
 		return []T{}
 	}
 	if 2*start >= d.len {
-		// +1 is needed because without it after skipping back, the current
-		// will be the first item that we need to take, but next() will skip it.
-		return d.BidiIter().ResetBack().SkipBack(d.len - start + 1).TakeSlice(n)
+		return d.BidiIter().ResetBack().SkipBack(d.len - start).TakeSlice(n)
 	}
 	return d.Iter().Skip(start).TakeSlice(n)
 }
@@ -735,7 +733,7 @@ func (d *Deque[T]) Slice(start, end int) []T {
 // On success, the length of the resulting slice is min(Len(), end-start).
 // Returns an empty slice if the range is invalid.
 func (d *Deque[T]) PtrSlice(start, end int) []*T {
-	if start < 0 || end < 1 {
+	if start >= d.len || start < 0 {
 		return []*T{}
 	}
 	n := end - start
@@ -743,9 +741,7 @@ func (d *Deque[T]) PtrSlice(start, end int) []*T {
 		return []*T{}
 	}
 	if 2*start >= d.len {
-		// +1 is needed because without it after skipping back, the current
-		// will be the first item that we need to take, but next() will skip it.
-		return d.BidiIter().ResetBack().SkipBack(d.len - start + 1).TakePtrSlice(n)
+		return d.BidiIter().ResetBack().SkipBack(d.len - start).TakePtrSlice(n)
 	}
 	return d.Iter().Skip(start).TakePtrSlice(n)
 }
