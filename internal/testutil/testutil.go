@@ -15,9 +15,13 @@
 package testutil
 
 import (
+	"math/rand"
+	"reflect"
 	"slices"
 	"testing"
 )
+
+const seed int64 = 31337
 
 func AssertEq[T comparable](
 	t *testing.T,
@@ -30,9 +34,9 @@ func AssertEq[T comparable](
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: want %v, got %v", msg[0], want, got)
+		t.Fatalf("%s: want %v, got %v", msg[0], want, got)
 	} else {
-		t.Errorf("want %v, got %v", want, got)
+		t.Fatalf("want %v, got %v", want, got)
 	}
 }
 
@@ -47,9 +51,9 @@ func AssertNotEq[T comparable](
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: want not equal to %v, got %v", msg[0], notWant, got)
+		t.Fatalf("%s: want not equal to %v, got %v", msg[0], notWant, got)
 	} else {
-		t.Errorf("want not equal to %v, got %v", notWant, got)
+		t.Fatalf("want not equal to %v, got %v", notWant, got)
 	}
 }
 
@@ -81,25 +85,25 @@ func AssertEqOk[T comparable](
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: want (%v, true), got (%v, %v)", msg[0], want, got, gotOK)
+		t.Fatalf("%s: want (%v, true), got (%v, %v)", msg[0], want, got, gotOK)
 	} else {
-		t.Errorf("want (%v, true), got (%v, %v)", want, got, gotOK)
+		t.Fatalf("want (%v, true), got (%v, %v)", want, got, gotOK)
 	}
 }
 
 func AssertNotNil[T any](
 	t *testing.T,
-	got *T,
+	got T,
 	msg ...string,
 ) {
 	t.Helper()
-	if got != nil {
+	if !IsNil(got) {
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: expected not nil", msg[0])
+		t.Fatalf("%s: expected not nil", msg[0])
 	} else {
-		t.Error("expected not nil")
+		t.Fatal("expected not nil")
 	}
 }
 
@@ -113,9 +117,9 @@ func AssertTrue(
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: want true, got %v", msg[0], got)
+		t.Fatalf("%s: want true, got %v", msg[0], got)
 	} else {
-		t.Error("want true, got false")
+		t.Fatal("want true, got false")
 	}
 }
 
@@ -129,9 +133,9 @@ func AssertFalse(
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: want false, got true", msg[0])
+		t.Fatalf("%s: want false, got true", msg[0])
 	} else {
-		t.Error("want false, got true")
+		t.Fatal("want false, got true")
 	}
 }
 
@@ -146,9 +150,9 @@ func AssertZero[T comparable](
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: want %v, got %v", msg[0], want, got)
+		t.Fatalf("%s: want %v, got %v", msg[0], want, got)
 	} else {
-		t.Errorf("want %v, got %v", want, got)
+		t.Fatalf("want %v, got %v", want, got)
 	}
 }
 
@@ -164,9 +168,9 @@ func AssertZeroFalse[T comparable](
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: want (%v, false), got (%v, %v)", msg[0], want, got, gotOK)
+		t.Fatalf("%s: want (%v, false), got (%v, %v)", msg[0], want, got, gotOK)
 	} else {
-		t.Errorf("want (%v, false), got (%v, %v)", want, got, gotOK)
+		t.Fatalf("want (%v, false), got (%v, %v)", want, got, gotOK)
 	}
 }
 
@@ -179,17 +183,17 @@ func AssertPtrSliceEq[T comparable](
 	t.Helper()
 	if len(got) != len(want) {
 		if len(msg) > 0 {
-			t.Errorf("%s (len): want %v, got %v", msg[0], len(want), len(got))
+			t.Fatalf("%s (len): want %v, got %v", msg[0], len(want), len(got))
 		} else {
-			t.Errorf("(len): want %v, got %v", len(want), len(got))
+			t.Fatalf("(len): want %v, got %v", len(want), len(got))
 		}
 	}
 	deref := DerefSlice(t, got)
 	if !slices.Equal(deref, want) {
 		if len(msg) > 0 {
-			t.Errorf("%s: want %v, got %v", msg[0], want, deref)
+			t.Fatalf("%s: want %v, got %v", msg[0], want, deref)
 		} else {
-			t.Errorf("want %v, got %v", want, deref)
+			t.Fatalf("want %v, got %v", want, deref)
 		}
 	}
 }
@@ -205,9 +209,9 @@ func AssertSliceEq[T comparable](
 		return
 	}
 	if len(msg) > 0 {
-		t.Errorf("%s: want %v, got %v", msg[0], want, got)
+		t.Fatalf("%s: want %v, got %v", msg[0], want, got)
 	} else {
-		t.Errorf("want %v, got %v", want, got)
+		t.Fatalf("want %v, got %v", want, got)
 	}
 }
 
@@ -255,6 +259,21 @@ func SliceFromRangeIncl(t *testing.T, from, to int) []int {
 	return res
 }
 
+// SliceFromRangeExclWithGaps is the same as [SliceFromRangeExcl] but
+// excludes the ones in exclude. Linear search - will be slow for many excludes.
+func SliceFromRangeExclWithGaps(t *testing.T, from, to int, exclude ...int) []int {
+	t.Helper()
+	ValidRangeOrDie(t, from, to)
+	res := make([]int, 0, to-from)
+	for i := from; i < to; i++ {
+		if slices.Contains(exclude, i) {
+			continue
+		}
+		res = append(res, i)
+	}
+	return res
+}
+
 // ValidRangeOrDie errors on from < 0 OR to < 1 OR from >= to
 func ValidRangeOrDie(t *testing.T, from, to int) {
 	t.Helper()
@@ -267,4 +286,28 @@ func ValidRangeOrDie(t *testing.T, from, to int) {
 	if from >= to {
 		t.Error("from >= to")
 	}
+}
+
+func RandomIntSlice(t *testing.T, intn int) []int {
+	t.Helper()
+	return RandomIntSliceN(t, intn, intn)
+}
+
+func RandomIntSliceN(t *testing.T, size, intn int) []int {
+	t.Helper()
+	rand := rand.New(rand.NewSource(seed))
+	a := make([]int, size)
+	for i := range size {
+		a[i] = rand.Intn(intn)
+	}
+	return a
+}
+
+func IsNil[T any](x T) bool {
+    v := reflect.ValueOf(x)
+    switch v.Kind() {
+    case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func:
+        return v.IsNil()
+    }
+    return false
 }

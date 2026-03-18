@@ -2,19 +2,117 @@
 
 <img src="docs/images/logo.png" alt="Project Logo" width="250"/>
 
-Chainyq provides generic lists and queues with a rich, flexible API. Written in pure Go with zero dependencies.
+Chainyq provides high-performance collections for go, with a rich API
+and a strict design: no dynamic dispatch, panics, or errors.
+Written in Go 1.25 with zero-dependencies.
 
-All methods have pointer receivers and are designed to fail fast - they will panic
-if called on a nil pointer. This eliminates the need for redundant nil checks in most cases
-and helps detect bugs early. Free functions that accept pointers tolerate nil, but methods do not.
+Currently available:
+- `Deque[T any]` - a cache-friendly segmented array deque (double-ended queue)
+with per-side capacity tuning and configurable pooling.
+Supports fast end operations, random access, and iterators.
+- `List[T any]` - a simple doubly-linked list that is a deque for cases
+when you need frequent insertion and/or deletion in the middle.
+- `Stack[T any]` - a slice-based stack with normal `Push`/`Pop`
+and top-to-bottom iterator.
+- `Seq[T any]` - a lazy sequence with 
+`Filter`/`Map`/`Reduce`/`ForEach`/`GroupBy`/`ToMap` kind of operations.
+Can be created from iterators, slices, and just functions, which is useful
+for creating infinite sequences.
+- `SyncDeque[T any]` - wrapper around `Deque[T]` with `sync.RWMutex`.
 
-Data structures in this library are designed to avoid dynamic dispatch wherever possible.
-The only exception is `Seq` which is inherently dynamic.
-If you really need interfaces, you can find general interfaces in the root package (`chainyq`).
-Implementation-specific interfaces are located in their respective packages.
+`Seq[T]` is the only type with dynamically dispatched operations,
+because a function pointer is needed to enable laziness.
+
+General interfaces are available in the root package (`chainyq`) with implementation-specific interfaces located in their respective packages.
+
+All methods are designed to not tolerate nil as a receiver to avoid redundant
+nil checks - just call `New()` instead or more specialized constructors
+if you need extra customization. Free functions that accept pointers
+tolerate nil.
 
 
-## List
+## Deque[T any]
+
+`chainyq.deque.Deque` is probably the fastest general-purpose deque you can find:
+
+| PushBack                   |  ns/op   | B/op | allocs/op |
+|----------------------------|----------|------|-----------|
+| chainyq.Deque              |    4.265 |    8 |         0 |
+| chainyq.Deque_Ensure       |    3.460 |    0 |         0 |
+| edwingeng.Deque            |    5.420 |    8 |         0 |
+| gammazero.Deque            |    5.889 |   14 |         0 |
+| gammazero.Deque_SetBaseCap |    3.885 |    8 |         0 |
+| chainyq.List               |   38.640 |   24 |         1 |
+| container.List             |   61.730 |   55 |         1 |
+
+| PushFront                  | ns/op    | B/op | allocs/op |
+|----------------------------|----------|------|-----------|
+| chainyq.Deque              |    3.782 |    8 |         0 |
+| edwingeng.Deque            |    4.273 |    8 |         0 |
+| gammazero.Deque            |    4.732 |   17 |         0 |
+| chainyq.List               |   33.800 |   24 |         1 |
+| container.List             |   60.950 |   55 |         1 |
+
+| Random churn (int)         | ns/op    | B/op | allocs/op |
+|----------------------------|----------|------|-----------|
+| chainyq.Deque              |    9.799 |    0 |         0 |
+| edwingeng.Deque            |   10.350 |    0 |         0 |
+| gammazero.Deque            |   10.880 |    0 |         0 |
+| chainyq.List               |   18.560 |   11 |           |
+| container.List             |   26.020 |   27 |           |
+
+| Random churn (big struct)  | ns/op    | B/op | allocs/op |
+|----------------------------|----------|------|-----------|
+| chainyq.Deque              |    14.56 |    0 |         0 |
+| edwingeng.Deque            |    15.61 |    0 |         0 |
+| gammazero.Deque            |    15.06 |    0 |         0 |
+
+| Random access (by index)   | ns/op    | B/op | allocs/op |
+|----------------------------|----------|------|-----------|
+| chainyq.Deque              |    28.67 |    0 |         0 |
+| edwingeng.Deque            |  2808.00 |    0 |         0 |
+| gammazero.Deque            |      DNF |    0 |         0 |
+
+<p><sub>See full benchmark results in bench.txt, or run it yourself - code is available at `/deque/deque_benchmark_test.go`</sub></p>
+
+```go
+d := deque.FromSlice([]int{2, 4, 8, 16})
+v, _ := d.Pop()  // 16, true
+d.PushFront(1)
+if v, ok := d.PopFront(); ok {  // v = 1
+	fmt.Printf("popped from front: %v\n", v)
+}
+d.ToSlice() // [2 4 8]
+```
+
+`chainyq.deque` package provides constructors `New`/`NewPooled`/`WithCfg`/`NewValue`/`FromSlice`/`FromSliceCfg` and helpers `SuggestBlockSize`/`Len`.
+
+The API of the deque itself consists of:
+- General collection operations: `Len`/`IsEmpty`
+- Peeks: `Front`/`FrontPtr`/`Back`/`BackPtr`
+- Mutations: `PushFront`/`PushBack`/`PopFront`/`PopBack`
+- Random access operations: `Get`/`GetPtr`/`Set`
+- Memory control: `EnsureFront`/`EnsureBack`/`ShrinkToFit`/`Clear`/`ClearRelease`
+- Iterators: `Iter`/`RevIter`/`BidiIter`
+- Misc: `String`/`GoString`/`Equals`
+
+The iterators have:
+- Slicing: `Slice`/`PtrSlice`
+- Collecting: `ToSlice`/`ToPtrSlice`/`ToChan`/`ToPtrChan`
+
+Iterator API:
+- Conversions: `Clone`/`Bidi`/`Rev`/`Seq`/`PtrSeq` + `RevSeq`/`RevPtrSeq` for bidi
+- Resets: `Reset` + `ResetBack` for bidi
+- Main: `HasNext`/`Next`/`NextPtr`/`Peek`/`PeekPtr` + `HasPrev`/`Prev`/`PrevPtr`/`PeekBack`/`PeekBackPtr` for bidi
+- Actions on remaining items: `ForEach`/`ForEachPtr`
+- Collecting remaining items: `ToChan`/`ToPtrChan`/`TakeSlice`/`TakePtrSlice`/`TakeWhile`/`TakeWhilePtr`
+- Traversal: `Skip`/`SkipWhile`/`SkipWhilePtr` + `SkipBack` for bidi
+
+See docs for the full API.
+
+Synchronized version of the deque is available as `chainyq.deque.syncdeque.SyncDeque`.
+
+## List[T any]
 `list.List` is a doubly-linked list that can do all the operations you expect from a linked list and more. The list is not safe for concurrent use.
 ```go
 import (
@@ -83,7 +181,8 @@ func main() {
 ```
 See more in the documentation.
 
-## Seq
+
+## Seq[T any]
 `seq.Seq` is a lazy sequence that can be created from anything that generates values
 i.e. `func(v T) bool`:
 ```go
@@ -112,37 +211,4 @@ See docs for the full list of available operations.
 (it *Iter[T]) PtrSeq() seq.Seq[*T]
 (it *RevIter[T]) Seq() seq.Seq[T]
 (it *RevIter[T]) PtrSeq() seq.Seq[*T]
-```
-
-## ListDeque
-
-`list.List` is already a deque, but if you need a restricted API focused only on deque operations,
-you can use `deque.listdeque.ListDeque` which implements only this interface (and `String`/`GoString` for debugging):
-```go
-type Deque[T any] interface {
-    Collection[T]
-    
-    PushBack(T)
-    PopBack() (T, bool)
-    Back() (T, bool)
-    
-    PushFront(T)
-    PopFront() (T, bool)
-    Front() (T, bool)
-}
-```
-It is recommended to use a named import for convenience:
-```go
-import (
-	deque "github.com/zelr0x/chainyq/deque/listdeque"
-)
-```
-
-### SyncListDeque
-Synchronized version of `ListDeque` is available as `SyncListDeque`. It has the same
-core interface and can be imported like this:
-```go
-import (
-	deque "github.com/zelr0x/chainyq/deque/listdeque/syncdeque"
-)
 ```

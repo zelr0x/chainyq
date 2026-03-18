@@ -28,16 +28,66 @@ type Collection[T any] interface {
 	IsEmpty() bool
 }
 
-type Deque[T any] interface {
+type Sequencer[T any] interface {
+	Seq() seq.Seq[T]
+	PtrSeq() seq.Seq[*T]
+}
+
+type BidiSequencer[T any] interface {
+	Sequencer[T]
+	RevSeq() seq.Seq[T]
+	RevpTrSeq() seq.Seq[*T]
+}
+
+type SeqCollection[T any] interface {
 	Collection[T]
+	Sequencer[T]
+	ToSlice() []T
+	ToPtrSlice() []*T
+}
+
+type BidiCollection[T any] interface {
+	SeqCollection[T]
+	BidiSequencer[T]
+	RevSeq() seq.Seq[T]
+	RevPtrSeq() seq.Seq[*T]
+}
+
+type RandomAccess[T any] interface {
+	Collection[T]
+	Get(int) (T, bool)
+	Set(int, T) (T, bool)
+}
+
+type Queue[T any] interface {
+	SeqCollection[T]
+	PushBack(T)
+	PopFront() (T, bool)
+	Front() (T, bool)
+	FrontPtr() (*T, bool)
+}
+
+type Stack[T any] interface {
+	SeqCollection[T]
+	PushBack(T)
+	PopBack() (T, bool)
+	Back() (T, bool)
+	BackPtr() (*T, bool)
+}
+
+type Deque[T any] interface {
+	BidiCollection[T]
+	RandomAccess[T]
 
 	PushBack(T)
 	PopBack() (T, bool)
 	Back() (T, bool)
+	BackPtr() (*T, bool)
 
 	PushFront(T)
 	PopFront() (T, bool)
 	Front() (T, bool)
+	FrontPtr() (*T, bool)
 }
 
 type Nexter[T any] interface {
@@ -46,22 +96,26 @@ type Nexter[T any] interface {
 
 type Peeker[T any] interface {
 	Peek() (T, bool)
+	PeekPtr() (*T, bool)
 	HasNext() bool
 }
 
 type Iterator[T any] interface {
+	Sequencer[T]
+	Peeker[T]
 	Nexter[T]
 	NextPtr() (*T, bool)
-	Peeker[T]
+}
+
+type BidiIterator[T any] interface {
+	BidiSequencer[T]
+	Iterator[T]
+	Prev() (T, bool)
+	PrevPtr() (*T, bool)
 }
 
 type CursorIterator[T any] interface {
 	Iterator[T]
 	Current() (T, bool)
 	CurrentPtr() (*T, bool)
-}
-
-type Sequencer[T any] interface {
-	Seq() seq.Seq[T]
-	PtrSeq() seq.Seq[*T]
 }
