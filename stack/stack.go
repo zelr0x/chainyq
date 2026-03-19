@@ -19,7 +19,10 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unsafe"
 
+	"github.com/zelr0x/chainyq/internal/numutil"
+	"github.com/zelr0x/chainyq/internal/unsafeutil"
 	"github.com/zelr0x/chainyq/seq"
 )
 
@@ -45,8 +48,28 @@ func New[T any]() *Stack[T] {
 // and returns it as a value.
 func NewValue[T any](initCap int) Stack[T] {
 	b := make([]T, 0, initCap)
+	return WrapValue(b)
+}
+
+// FromSlice creates a Stack by copying all the items from a given slice.
+func FromSlice[T any](vals []T) *Stack[T] {
+	b := make([]T, numutil.MaxInt(len(vals), 16))
+	copy(b, vals)
+	return Wrap(b)
+}
+
+// Wrap creates a Stack from a given slice by simply wrapping it.
+// Mutations to one are seen in the other until the slice grows.
+func Wrap[T any](slice []T) *Stack[T] {
+	s := WrapValue(slice)
+	return &s
+}
+
+// WrapValue creates a Stack from a given slice by simply wrapping it.
+// Mutations to one are seen in the other until the slice grows.
+func WrapValue[T any](slice []T) Stack[T] {
 	return Stack[T]{
-		b: b,
+		b: slice,
 	}
 }
 
@@ -142,38 +165,60 @@ func (s *Stack[T]) Push(v T) {
 	s.b = append(s.b, v)
 }
 
+// PushBack is an alias for [Push] added to conform to [chainyq.Stack].
+func (s *Stack[T]) PushBack(v T) {
+	s.Push(v)
+}
+
 // Pop removes and returns top item of the stack and true if the stack
 // is not empty, zero value and false otherwise.
 func (s *Stack[T]) Pop() (T, bool) {
-	n := len(s.b)
+	b := s.b
+	n := len(b)
 	if n == 0 {
 		var zero T
 		return zero, false
 	}
-	v := s.b[n-1]
-	s.b = s.b[:n-1]
+	base := unsafe.SliceData(b)
+	v := *unsafeutil.At(base, n-1)
+	s.b = unsafe.Slice(base, n-1)
 	return v, true
+}
+
+// PopBack is an alias for [Pop] added to conform to [chainyq.Stack].
+func (s *Stack[T]) PopBack() (T, bool) {
+	return s.Pop()
 }
 
 // Peek returns the top item of the stack and true if the stack is not empty,
 // otherwise zero value and false. After that the item remains on the stack.
 func (s *Stack[T]) Peek() (T, bool) {
-	n := len(s.b)
+	b := s.b
+	n := len(b)
 	if n == 0 {
 		var zero T
 		return zero, false
 	}
-	v := s.b[n-1]
-	return v, true
+	return *unsafeutil.At(unsafe.SliceData(b), n-1), true
+}
+
+// Back is an alias for [Peek] added to conform to [chainyq.Stack].
+func (s *Stack[T]) Back() (T, bool) {
+	return s.Peek()
 }
 
 func (s *Stack[T]) PeekPtr() (*T, bool) {
-	n := len(s.b)
+	b := s.b
+	n := len(b)
 	if n == 0 {
 		return nil, false
 	}
-	v := &s.b[n-1]
-	return v, true
+	return unsafeutil.At(unsafe.SliceData(b), n-1), true
+}
+
+// BackPtr is an alias for [PeekPtr] added to conform to [chainyq.Stack].
+func (s *Stack[T]) BackPtr() (*T, bool) {
+	return s.PeekPtr()
 }
 
 // Ensure increases the stack's capacity to fit cap n more items.
@@ -186,6 +231,33 @@ func (s *Stack[T]) Ensure(n int) {
 // Clear removes all items from the stack.
 func (s *Stack[T]) Clear() {
 	s.b = s.b[:0]
+}
+
+// ToSlice returns a slice of all items from top to bottom (logical order).
+func (s *Stack[T]) ToSlice() []T {
+	b := s.b
+	n := len(b)
+	if n == 0 {
+		return []T{}
+	}
+	res := make([]T, 0, n)
+	for i := n-1; i >= 0; i-- {
+		res = append(res, b[i])
+	}
+	return res
+}
+
+// Unwrap returns the copy of the underlying slice (physical order).
+func (s *Stack[T]) UnwrapCopy() []T {
+	b := s.b
+	res := make([]T, len(b))
+	copy(res, b)
+	return res
+}
+
+// Returns the underlying slice directly.
+func (s *Stack[T]) UnwrapUnsafe() []T {
+	return s.b
 }
 
 // Iter creates a new iterator for this stack. Traversal order is LIFO,
