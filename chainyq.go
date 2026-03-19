@@ -113,9 +113,3 @@ type BidiIterator[T any] interface {
 	Prev() (T, bool)
 	PrevPtr() (*T, bool)
 }
-
-type CursorIterator[T any] interface {
-	Iterator[T]
-	Current() (T, bool)
-	CurrentPtr() (*T, bool)
-}

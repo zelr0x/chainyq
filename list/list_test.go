@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/zelr0x/chainyq/internal/numutil"
 	. "github.com/zelr0x/chainyq/internal/testutil"
 )
 
@@ -473,34 +474,43 @@ func TestNewBidiIterNotNil(t *testing.T) {
 }
 
 func TestSliceAndPtrSlice(t *testing.T) {
-	lEven := listFromRangeIncl(t, 1, 6)
-	lOdd := listFromRangeIncl(t, 1, 5)
+	even := SliceFromRangeIncl(t, 1, 6)
+	odd := even[0 : len(even)-1]
 	tests := []struct {
-		name     string
-		list     *List[int]
-		start    int
-		end      int
-		wantVals []int
+		name  string
+		slice []int
+		start int
+		end   int
 	}{
-		{"empty slice from empty list", New[int](), 0, 3, []int{}},
-		{"full slice even length", lEven, 0, 6, []int{1, 2, 3, 4, 5, 6}},
-		{"full slice odd length", lOdd, 0, 5, []int{1, 2, 3, 4, 5}},
-		{"partial slice middle", lEven, 2, 5, []int{3, 4, 5}},
-		{"slice with start=0 end=0", lEven, 0, 0, []int{}},
-		{"slice with start=end", lEven, 3, 3, []int{}},
-		{"slice with start>end", lEven, 4, 2, []int{}},
-		{"slice with negative start", lEven, -2, 3, []int{}},
-		{"slice with negative end", lEven, 0, -1, []int{}},
-		{"slice with end beyond length", lOdd, 0, 10, []int{1, 2, 3, 4, 5}},
-		{"slice with start beyond length", lOdd, 10, 15, []int{}},
-		{"slice covering tail", lEven, 4, 10, []int{5, 6}},
+		{"empty slice from empty list", []int{}, 0, 3},
+		{"full slice even length", even, 0, 6},
+		{"full slice odd length", odd, 0, 5},
+		{"partial slice middle", even, 2, 5},
+		{"slice with start=0 end=0", even, 0, 0},
+		{"slice with start=end", even, 3, 3},
+		{"slice with start>end", even, 4, 2},
+		{"slice with negative start", even, -2, 3},
+		{"slice with negative end", even, 0, -1},
+		{"slice with end beyond length", odd, 0, 10},
+		{"slice with start beyond length", odd, 10, 15},
+		{"slice covering tail", even, 4, 10},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.list.Slice(tt.start, tt.end)
-			AssertSliceEq(t, tt.wantVals, got, "Slice")
-			ptrGot := tt.list.PtrSlice(tt.start, tt.end)
-			AssertPtrSliceEq(t, tt.wantVals, ptrGot, "PtrSlice")
+			slice := tt.slice
+			start := tt.start
+			var want []int
+			if start >= 0 && start < len(slice) && tt.end > start {
+				want = slice[start:numutil.MinInt(tt.end, len(slice))]
+			} else {
+				want = []int{}
+			}
+
+			l := FromSlice(slice)
+			got := l.Slice(tt.start, tt.end)
+			AssertSliceEq(t, want, got, "Slice")
+			ptrGot := l.PtrSlice(tt.start, tt.end)
+			AssertPtrSliceEq(t, want, ptrGot, "PtrSlice")
 		})
 	}
 }
@@ -548,85 +558,87 @@ func TestBidiIterDoesNotAllowToGoPastSentinel(t *testing.T) {
 	AssertZeroFalse(t, val, ok, "Next after ResetBack should be false")
 }
 
-func TestBidiIterCloneResetAndCurrent(t *testing.T) {
+func TestBidiIterCloneResetAndPrev(t *testing.T) {
 	l := listFromRangeIncl(t, 1, 3)
 	it := l.BidiIter()
 	AssertNotNil(t, it)
-	val, ok := it.Current()
-	AssertZeroFalse(t, val, ok, "Current should be false before Next")
-	ptr, ok := it.CurrentPtr()
-	AssertZeroFalse(t, ptr, ok, "CurrentPtr should be false before Next")
+	val, ok := it.Prev()
+	AssertZeroFalse(t, val, ok, "Prev should be false before Next")
+	ptr, ok := it.PrevPtr()
+	AssertZeroFalse(t, ptr, ok, "PrevPtr should be false before Next")
 
 	// Advance once
 	it.Next()
-	val, ok = it.Current()
-	AssertEqOk(t, 1, val, ok, "Current after next")
-	ptr, ok = it.CurrentPtr()
-	AssertNotNil(t, ptr, "CurrentPtr after next not nil")
-	AssertEqOk(t, 1, *ptr, ok, "CurrentPtr after next")
+	val, ok = it.PeekBack()
+	AssertEqOk(t, 1, val, ok, "PeekBack after next")
+	ptr, ok = it.PeekBackPtr()
+	AssertNotNil(t, ptr, "PeekBackPtr after next not nil")
+	AssertEqOk(t, 1, *ptr, ok, "PeekBackPtr after next")
 
 	// Clone should point to same position
 	clone := it.Clone()
-	valClone, okClone := clone.Current()
-	AssertEqOk(t, 1, valClone, okClone, "Current after Clone")
+	valClone, okClone := clone.Prev()
+	AssertEqOk(t, 1, valClone, okClone, "Prev after Clone")
 
 	// Reset should go back to head
-	it.Reset().Next()
-	val, ok = it.Current()
-	AssertEqOk(t, 1, val, ok, "Current after Reset Next")
+	val, ok = it.Reset().Next()
+	AssertEqOk(t, 1, val, ok, "Next after Reset")
 
 	// ResetBack should go to tail
-	val, ok = it.ResetBack().Current()
-	AssertZeroFalse(t, val, ok, "Current after ResetBack")
+	val, ok = it.ResetBack().Next()
+	AssertZeroFalse(t, val, ok, "Next after ResetBack")
 
-	it.Prev() // step back once to get to last item
-	it.Next() // step forward once - should not go to tail
-	val, ok = it.Current()
-	AssertEqOk(t, 3, val, ok, "Current after ResetBack Prev Next")
+	it.Prev() // step back once
+	val, ok = it.Next()
+	AssertEqOk(t, 3, val, ok, "Next after ResetBack")
 }
 
 func TestBidiIterEmptyList(t *testing.T) {
 	l := New[int]()
 	it := l.BidiIter()
 	AssertNotNil(t, it)
-	val, ok := it.Current()
-	AssertZeroFalse(t, val, ok, "Current on empty list")
-	ptr, ok := it.CurrentPtr()
-	AssertZeroFalse(t, ptr, ok, "CurrentPtr on empty list")
+	val, ok := it.Prev()
+	AssertZeroFalse(t, val, ok, "Prev on empty list")
+	ptr, ok := it.PrevPtr()
+	AssertZeroFalse(t, ptr, ok, "PrevPtr on empty list")
 
 	// Reset should still be safe
 	it.Reset()
-	val, ok = it.Current()
-	AssertZeroFalse(t, val, ok, "Current after Reset on empty list")
+	val, ok = it.Prev()
+	AssertZeroFalse(t, val, ok, "Prev after Reset on empty list")
 
 	// ResetBack should also be safe
 	it.ResetBack()
-	val, ok = it.Current()
-	AssertZeroFalse(t, val, ok, "Current after ResetBack on empty list")
+	val, ok = it.Next()
+	AssertZeroFalse(t, val, ok, "Next after ResetBack on empty list")
 }
 
 func TestBidiIterNavigation(t *testing.T) {
-	l := listFromRangeIncl(t, 1, 3)
+	slice := SliceFromRangeIncl(t, 1, 3)
+	l := FromSlice(slice)
 	it := l.BidiIter()
-	AssertTrue(t, it.HasNext(), "HasNext at start should be true")
-	AssertFalse(t, it.HasPrev(), "HasPrev at start should be false")
+	AssertTrue(t, it.HasNext(), "HasNext at head sentinel should be true")
+	AssertFalse(t, it.HasPrev(), "HasPrev at head sentinel should be false")
 
 	val, ok := it.Peek()
-	AssertEqOk(t, 1, val, ok, "Peek should show first element without advancing")
+	AssertEqOk(t, slice[0], val, ok, "Peek should show first element without advancing")
 	val, ok = it.Next()
-	AssertEqOk(t, 1, val, ok, "Next should advance into first element")
-
-	AssertFalse(t, it.HasPrev(), "HasPrev at first non-sentinel")
+	AssertEqOk(t, slice[0], val, ok, "Next should advance into first element")
+	AssertTrue(t, it.HasPrev(), "HasPrev after first next should be true")
+	val, ok = it.PeekBack()
+	AssertEqOk(t, slice[0], val, ok, "PeekBack should give the item we just traversed")
 
 	val, ok = it.Next()
-	AssertEqOk(t, 2, val, ok, "Next should advance further")
+	AssertEqOk(t, slice[1], val, ok, "Next should advance further")
+	val, ok = it.Prev()
+	AssertEqOk(t, slice[1], val, ok, "Prev should step back")
+	val, ok = it.Peek()
+	AssertEqOk(t, slice[1], val, ok, "Peek after Prev should show second")
 
 	AssertTrue(t, it.HasPrev(), "HasPrev at second element")
 
-	val, ok = it.Prev()
-	AssertEqOk(t, 1, val, ok, "Prev should step back")
-	val, ok = it.Peek()
-	AssertEqOk(t, 2, val, ok, "Peek after Prev should show second")
+	got := it.Reset().TakeSlice(len(slice))
+	AssertSliceEq(t, slice, got)
 }
 
 func TestBidiIterNavigationEmptyList(t *testing.T) {
@@ -679,12 +691,15 @@ func TestBidiIterRemoveAndInsert(t *testing.T) {
 
 	it.ResetBack()
 	val, ok = it.Remove()
-	AssertFalse(t, ok, "Remove at tail sentinel should fail")
-	AssertFalse(t, it.InsertAfter(99), "InsertAfter at tail sentinel should fail")
+	AssertFalse(t, ok, "Remove after reset back should fail")
+	AssertFalse(t, it.InsertAfter(99), "InsertAfter after ResetBack should fail")
 
+	AssertSliceEq(t, []int{77, 1, 2, 3}, l.ToSlice())
 	it.Prev()
-	AssertTrue(t, it.InsertAfter(66), "InsertAfter at at last item should succeed")
-	AssertSliceEq(t, []int{77, 1, 2, 3, 66}, l.ToSlice(), "InsertAfter at last item")
+	AssertTrue(t, it.InsertAfter(99), "InsertAfter after ResetBack Prev should work")
+	AssertSliceEq(t, []int{77, 1, 2, 3, 99}, l.ToSlice())
+	val, ok = it.Remove()
+	AssertSliceEq(t, []int{77, 1, 2, 99}, l.ToSlice(), "InsertAfter should not change the last traversed item")
 }
 
 func TestIterForEachAndChannels(t *testing.T) {
@@ -935,7 +950,7 @@ func TestIterTakeSkipEmpty(t *testing.T) {
 	}).DrainWhilePtr(func(p *int) bool {
 		return true
 	})
-	got, ok := it.Current()
+	got, ok := it.Next()
 	AssertZeroFalse(t, got, ok,
 		"Skip SkipBack SkipWhile DrainWhile DrainWhilePtr on empty")
 }
@@ -972,13 +987,15 @@ func TestDocExample1(t *testing.T) {
 	ok = it.InsertBefore(55)
 	AssertEq(t, true, ok, "InsertBefore first item")
 	v, ok = it.Prev()
-	AssertEqOk(t, 55, v, ok, "Prev at first item after InsertBefore")
+	AssertEqOk(t, 1, v, ok, "InsertBefore should not move the iterator's cursor")
+	v, ok = it.Prev()
+	AssertEqOk(t, 55, v, ok, "Prev Prev after InsertBefore should give inserted item")
 	v, ok = it.Remove()
 	AssertEqOk(t, 55, v, ok, "Remove at value 55")
 	v, ok = it.Next()
 	AssertEqOk(t, 1, v, ok, "Next")
 	v, ok = it.PeekBack()
-	AssertZeroFalse(t, v, ok, "PeekBack at first item")
+	AssertEqOk(t, 1, v, ok, "PeekBack after next should give item returned by next")
 	AssertSliceEq(t, want, l.ToSlice(), "ops cancelled each other")
 
 	p, ok := it.ResetBack().PrevPtr()

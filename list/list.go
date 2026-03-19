@@ -34,8 +34,9 @@ type List[T any] struct {
 
 // Iter is a bidirectional iterator for a List. Not thread-safe.
 type BidiIter[T any] struct {
-	l   *List[T]
-	cur *node[T]
+	l    *List[T]
+	cur  *node[T] // node before the next element
+	last *node[T] // last returned element
 }
 
 // Iter is a forward iterator for a List. Not thread-safe.
@@ -48,11 +49,11 @@ type RevIter[T any] struct {
 	b BidiIter[T]
 }
 
-// ListIter defines the methods shared by Iter, BidiIter, and RevIter.
+// ListIterator defines the methods shared by Iter, BidiIter, and RevIter.
 // Not that most methods of Iter and BidiIter behave similarly, while
 // RevIter's methods work in the opposite direction.
 type ListIterator[T any] interface {
-	chainyq.CursorIterator[T]
+	chainyq.Iterator[T]
 	chainyq.Sequencer[T]
 	Insert(val T) bool
 	Remove() (T, bool)
@@ -414,7 +415,7 @@ func (l *List[T]) Iter() *Iter[T] {
 // by one or more items. All operations work on the remaining portion
 // of the list.
 func (l *List[T]) RevIter() *RevIter[T] {
-	return &RevIter[T]{b: l.newIter(l.tail)}
+	return &RevIter[T]{b: l.newIter(l.tail.prev)}
 }
 
 // BidiIter creates a bidirectional iterator over the list.
@@ -430,7 +431,7 @@ func (l *List[T]) BidiIter() *BidiIter[T] {
 // On success, the length of the resulting slice is min(Len(), end-start).
 // Returns an empty slice if the range is invalid.
 func (l *List[T]) Slice(start, end int) []T {
-	if start >= l.len || start < 0 || end < 1 {
+	if start >= l.len || start < 0 {
 		return []T{}
 	}
 	n := end - start
@@ -438,9 +439,7 @@ func (l *List[T]) Slice(start, end int) []T {
 		return []T{}
 	}
 	if 2*start >= l.len {
-		// +1 is needed because without it after skipping back, the current
-		// will be the first item that we need to take, but next() will skip it.
-		return l.BidiIter().ResetBack().SkipBack(l.len - start + 1).TakeSlice(n)
+		return l.BidiIter().ResetBack().SkipBack(l.len - start).TakeSlice(n)
 	}
 	return l.Iter().Skip(start).TakeSlice(n)
 }
@@ -449,13 +448,15 @@ func (l *List[T]) Slice(start, end int) []T {
 // On success, the length of the resulting slice is min(Len(), end-start).
 // Returns an empty slice if the range is invalid.
 func (l *List[T]) PtrSlice(start, end int) []*T {
-	if start < 0 || end < 1 {
+	if start >= l.len || start < 0 {
 		return []*T{}
 	}
-	// TODO: make it skip from the end if start is closer to the end.
 	n := end - start
 	if n < 1 {
 		return []*T{}
+	}
+	if 2*start >= l.len {
+		return l.BidiIter().ResetBack().SkipBack(l.len - start).TakePtrSlice(n)
 	}
 	return l.Iter().Skip(start).TakePtrSlice(n)
 }
@@ -560,26 +561,6 @@ func (it *Iter[T]) Reset() *Iter[T] {
 	return it
 }
 
-// Current returns the item the iterator is "at" -  which is the last
-// traversed item.
-//
-// This is intended for special introspection/debugging purposes,
-// not as the main traversal method - for the main traversal use [Next]
-// or [Prev].
-func (it *Iter[T]) Current() (T, bool) {
-	return it.b.Current()
-}
-
-// CurrentPtr returns the item the iterator is "at" -  which is the last
-// traversed item.
-//
-// This is intended for special introspection/debugging purposes,
-// not as the main traversal method - for the main traversal use [Next]
-// or [Prev].
-func (it *Iter[T]) CurrentPtr() (*T, bool) {
-	return it.b.CurrentPtr()
-}
-
 // HasNext reports whether there is a next item.
 //
 // You only need to call this method explicitly if you want to check for
@@ -612,18 +593,17 @@ func (it *Iter[T]) PeekPtr() (*T, bool) {
 	return it.b.PeekPtr()
 }
 
-// Remove removes the current item from the underlying list and returns
-// it and true if the operation succeeded, otherwise zero value and false.
+// Remove removes the last traversed item from the underlying list
+// and returns it and true on success, zero value and false otherwise.
+//
 // The iterator is then repositioned at the predeccessor of the removed item.
 // A subsequent call to Next() will return the successor to the removed item.
-// Returns false if there's nothing to remove i.e. the iterator points to either
-// the head or tail of the underlying list. Modifies the underlying list.
+// Modifies the underlying list.
 func (it *Iter[T]) Remove() (T, bool) {
 	return it.b.Remove()
 }
 
-// Insert inserts the given item after the current item. If called on an
-// iterator that is currently at the tail of the list, false is returned.
+// Insert inserts the given item after the last traversed item.
 func (it *Iter[T]) Insert(val T) bool {
 	return it.b.InsertAfter(val)
 }
@@ -639,13 +619,13 @@ func (it *Iter[T]) ForEachPtr(f func(val *T) bool) {
 }
 
 // ToChan consumes the iterator and returns a channel of specified size
-// to which all next items starting from the current position will be written.
+// to which all next items will be written.
 func (it *Iter[T]) ToChan(size int) <-chan T {
 	return it.b.ToChan(size)
 }
 
 // ToPtrChan consumes the iterator and returns a read channel of specified size
-// to which all next items starting from the current position will be written.
+// to which all next items will be written.
 func (it *Iter[T]) ToPtrChan(size int) <-chan *T {
 	return it.b.ToPtrChan(size)
 }
@@ -750,26 +730,6 @@ func (it *RevIter[T]) Reset() *RevIter[T] {
 	return it
 }
 
-// Current returns the item the iterator is "at" -  which is the last
-// traversed item.
-//
-// This is intended for special introspection/debugging purposes,
-// not as the main traversal method - for the main traversal use [Next]
-// or [Prev].
-func (it *RevIter[T]) Current() (T, bool) {
-	return it.b.Current()
-}
-
-// CurrentPtr returns the item the iterator is "at" -  which is the last
-// traversed item.
-//
-// This is intended for special introspection/debugging purposes,
-// not as the main traversal method - for the main traversal use [Next]
-// or [Prev].
-func (it *RevIter[T]) CurrentPtr() (*T, bool) {
-	return it.b.CurrentPtr()
-}
-
 // HasNext reports whether there is a next item.
 //
 // You only need to call this method explicitly if you want to check for
@@ -802,18 +762,17 @@ func (it *RevIter[T]) PeekPtr() (*T, bool) {
 	return it.b.PeekBackPtr()
 }
 
-// Remove removes the current item from the underlying list and returns
-// it and true if the operation succeeded, otherwise zero value and false.
+// Remove removes the last traversed item from the underlying list
+// and returns it and true on success, zero value and false otherwise.
+//
 // The iterator is then repositioned at the predeccessor of the removed item.
 // A subsequent call to Next() will return the successor to the removed item.
-// Returns false if there's nothing to remove i.e. the iterator points to either
-// the head or tail of the underlying list. Modifies the underlying list.
+// Modifies the underlying list.
 func (it *RevIter[T]) Remove() (T, bool) {
 	return it.b.Remove()
 }
 
-// Insert inserts the given item after the current item. If called on an
-// iterator that is currently at the tail of the list, false is returned.
+// Insert inserts the given item after the last traversed item.
 func (it *RevIter[T]) Insert(val T) bool {
 	return it.b.InsertBefore(val)
 }
@@ -839,7 +798,7 @@ func (it *RevIter[T]) ForEachPtr(f func(val *T) bool) {
 }
 
 // ToChan consumes the iterator and returns a channel of specified size
-// to which all next items starting from the current position will be written.
+// to which all next items will be written.
 func (it *RevIter[T]) ToChan(size int) <-chan T {
 	ch := make(chan T, size)
 	go func() {
@@ -852,7 +811,7 @@ func (it *RevIter[T]) ToChan(size int) <-chan T {
 }
 
 // ToPtrChan consumes the iterator and returns a read channel of specified size
-// to which all next items starting from the current position will be written.
+// to which all next items will be written.
 func (it *RevIter[T]) ToPtrChan(size int) <-chan *T {
 	ch := make(chan *T, size)
 	go func() {
@@ -1012,43 +971,16 @@ func (it *BidiIter[T]) Clone() *BidiIter[T] {
 // and returns the iterator itself.
 func (it *BidiIter[T]) Reset() *BidiIter[T] {
 	it.cur = it.l.head
+	it.last = nil
 	return it
 }
 
 // ResetBack sets this iterator to point to the back (tail) of the underlying
 // list and returns the iterator itself.
 func (it *BidiIter[T]) ResetBack() *BidiIter[T] {
-	it.cur = it.l.tail
+	it.cur = it.l.tail.prev
+	it.last = nil
 	return it
-}
-
-// Current returns the item the iterator is "at" -  which is the last
-// traversed item.
-//
-// This is intended for special introspection/debugging purposes,
-// not as the main traversal method - for the main traversal use [Next]
-// or [Prev].
-func (it *BidiIter[T]) Current() (T, bool) {
-	cur := it.cur
-	if cur == it.l.head || cur == it.l.tail {
-		var zero T
-		return zero, false
-	}
-	return cur.val, true
-}
-
-// CurrentPtr returns the item the iterator is "at" -  which is the last
-// traversed item.
-//
-// This is intended for special introspection/debugging purposes,
-// not as the main traversal method - for the main traversal use [Next]
-// or [Prev].
-func (it *BidiIter[T]) CurrentPtr() (*T, bool) {
-	cur := it.cur
-	if cur == it.l.head || cur == it.l.tail {
-		return nil, false
-	}
-	return &cur.val, true
 }
 
 // HasNext reports whether there is a next item.
@@ -1057,54 +989,55 @@ func (it *BidiIter[T]) CurrentPtr() (*T, bool) {
 // remaining items yourself. Most iterator methods call it internally.
 func (it *BidiIter[T]) HasNext() bool {
 	next := it.cur.next
-	return next != nil && next != it.l.tail
+	return next != it.l.tail && next != nil
 }
 
 // HasPrev reports whether there is a previous item.
 func (it *BidiIter[T]) HasPrev() bool {
-	prev := it.cur.prev
-	return prev != nil && prev != it.l.head
+	prev := it.cur
+	return prev != it.l.head && prev != nil
 }
 
 // Next returns the next item and true if the item is available,
 // zero value and false otherwise. The iterator advances by one position.
 func (it *BidiIter[T]) Next() (T, bool) {
-	v, ok := it.Peek()
-	if ok {
-		it.advance()
+	if !it.HasNext() {
+		var zero T
+		return zero, false
 	}
-	return v, ok
+	n := it.advance()
+	return n.val, true
 }
 
 // NextPtr returns a pointer to the next item and true if it is available,
 // nil and false otherwise. The iterator advances by one position.
 func (it *BidiIter[T]) NextPtr() (*T, bool) {
-	// it is a contract that it.cur is never it.l.tail
-	v, ok := it.PeekPtr()
-	if ok {
-		it.advance()
+	if !it.HasNext() {
+		return nil, false
 	}
-	return v, ok
+	n := it.advance()
+	return &n.val, true
 }
 
 // Prev returns the previous item and true if the item is available,
 // zero value and false otherwise.
 func (it *BidiIter[T]) Prev() (T, bool) {
-	v, ok := it.PeekBack()
-	if ok {
-		it.stepBack()
+	if !it.HasPrev() {
+		var zero T
+		return zero, false
 	}
-	return v, ok
+	n := it.stepBack()
+	return n.val, true
 }
 
 // PrevPtr returns the previous item and true if the item is available,
 // zero value and false otherwise.
 func (it *BidiIter[T]) PrevPtr() (*T, bool) {
-	v, ok := it.PeekBackPtr()
-	if ok {
-		it.stepBack()
+	if !it.HasPrev() {
+		return nil, false
 	}
-	return v, ok
+	n := it.stepBack()
+	return &n.val, true
 }
 
 // Peek returns the next item and true if it is available,
@@ -1133,7 +1066,7 @@ func (it *BidiIter[T]) PeekBack() (T, bool) {
 		var zero T
 		return zero, false
 	}
-	return it.cur.prev.val, true
+	return it.cur.val, true
 }
 
 // PeekBackPtr returns a pointer to the previous item and true
@@ -1142,50 +1075,52 @@ func (it *BidiIter[T]) PeekBackPtr() (*T, bool) {
 	if !it.HasPrev() {
 		return nil, false
 	}
-	return &it.cur.prev.val, true
+	return &it.cur.val, true
 }
 
-// Remove removes the current item from the underlying list and returns
-// it and true if the operation succeeded, otherwise zero value and false.
+// Remove removes the last traversed item.
+// from the underlying list. Returns the removed item and true on success,
+// zero value and false otherwise.
+//
 // The iterator is then repositioned at the predeccessor of the removed item.
 // A subsequent call to Next() will return the successor to the removed item.
-// Returns false if there's nothing to remove i.e. the iterator points to either
-// the head or tail of the underlying list. Modifies the underlying list.
 func (it *BidiIter[T]) Remove() (T, bool) {
-	if it.cur == it.l.head || it.cur == it.l.tail {
+	if it.last == nil {
 		var zero T
 		return zero, false
 	}
-	rem := it.cur
-	it.stepBack()
+	rem := it.last
+	it.last = nil
+	if rem == it.cur {
+		it.cur = rem.prev
+	}
 	return it.l.remove(rem)
 }
 
-// InsertBefore inserts the given item before the current item. If called on an
-// iterator that is currently at the head of the list, false is returned.
-// Modifies the underlying list.
+// InsertBefore inserts the given item before the last traversed item.
 func (it *BidiIter[T]) InsertBefore(val T) bool {
-	if it.cur == it.l.head {
+	last := it.last
+	if last == nil {
 		return false
 	}
 	newNode := it.l.newNode(val)
-	it.l.insertBefore(it.cur, newNode)
+	it.l.insertBefore(last, newNode)
 	return true
 }
 
-// InsertAfter inserts the given item after the current item. If called on an
-// iterator that is currently at the tail of the list, false is returned.
+// InsertAfter inserts the given item after the last traversed item.
 func (it *BidiIter[T]) InsertAfter(val T) bool {
-	if it.cur == it.l.tail {
+	last := it.last
+	if last == nil {
 		return false
 	}
 	newNode := it.l.newNode(val)
-	it.l.insertAfter(it.cur, newNode)
+	it.l.insertAfter(last, newNode)
 	return true
 }
 
 // Insert is an alias for [BidiIter.InsertAfter], added to make BidiIter
-// conform to [ListIter] interface.
+// conform to [ListIterator] interface.
 func (it *BidiIter[T]) Insert(val T) bool {
 	return it.InsertAfter(val)
 }
@@ -1211,7 +1146,7 @@ func (it *BidiIter[T]) ForEachPtr(f func(val *T) bool) {
 }
 
 // ToChan consumes the iterator and returns a channel of specified size
-// to which all next items starting from the current position will be written.
+// to which all next items will be written.
 func (it *BidiIter[T]) ToChan(size int) <-chan T {
 	ch := make(chan T, size)
 	go func() {
@@ -1224,7 +1159,7 @@ func (it *BidiIter[T]) ToChan(size int) <-chan T {
 }
 
 // ToPtrChan consumes the iterator and returns a read channel of specified size
-// to which all next items starting from the current position will be written.
+// to which all next items will be written.
 func (it *BidiIter[T]) ToPtrChan(size int) <-chan *T {
 	ch := make(chan *T, size)
 	go func() {
@@ -1239,15 +1174,16 @@ func (it *BidiIter[T]) ToPtrChan(size int) <-chan *T {
 // TakeSlice collects up to n items to a slice, starting from the next
 // item. Returns an empty slice if the list is empty.
 func (it *BidiIter[T]) TakeSlice(n int) []T {
-	if !it.HasNext() || n < 1 {
+	if n < 1 || !it.HasNext() {
 		return []T{}
 	}
 	res := make([]T, 0, min(it.l.len, n))
-	i := 0
-	for v, ok := it.Peek(); ok && i < n; v, ok = it.Peek() {
+	for i := 0; i < n; i++ {
+		v, ok := it.Next()
+		if !ok {
+			break
+		}
 		res = append(res, v)
-		_, _ = it.Next()
-		i++
 	}
 	if len(res) == 0 { // defensive check, should never be true.
 		return []T{}
@@ -1258,15 +1194,16 @@ func (it *BidiIter[T]) TakeSlice(n int) []T {
 // TakePtrSlice collects up to n items to a slice, starting from the next
 // item. Returns an empty slice if the list is empty.
 func (it *BidiIter[T]) TakePtrSlice(n int) []*T {
-	if !it.HasNext() || n < 1 {
+	if n < 1 || !it.HasNext() {
 		return []*T{}
 	}
 	res := make([]*T, 0, min(it.l.len, n))
-	i := 0
-	for v, ok := it.PeekPtr(); ok && i < n; v, ok = it.PeekPtr() {
+	for i := 0; i < n; i++ {
+		v, ok := it.NextPtr()
+		if !ok {
+			break
+		}
 		res = append(res, v)
-		_, _ = it.Next()
-		i++
 	}
 	if len(res) == 0 { // defensive check, should never be true.
 		return []*T{}
@@ -1395,10 +1332,19 @@ func (it *BidiIter[T]) RevPtrSeq() seq.Seq[*T] {
 	return seq.New(rev.PrevPtr)
 }
 
-func (it *BidiIter[T]) advance() {
-	it.cur = it.cur.next
+// advance steps forward. Returns next node.
+func (it *BidiIter[T]) advance() *node[T] {
+	cur := it.cur
+	next := cur.next
+	it.cur = next
+	it.last = next
+	return next
 }
 
-func (it *BidiIter[T]) stepBack() {
-	it.cur = it.cur.prev
+// stepBack steps back. Returns prev node.
+func (it *BidiIter[T]) stepBack() *node[T] {
+	n := it.cur
+	it.last = n
+	it.cur = n.prev
+	return n
 }

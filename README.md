@@ -163,7 +163,6 @@ func main() {
 
 	v, ok = it.ResetBack().PrevPtr() // -> int* pointing to 2, ok
 	*v += 98
-	v, ok = it.Current() // -> 100, true
 	ok = it.InsertAfter(42)
 	l.String() // -> List[1 2 8 16 8 4 100 42]
 
