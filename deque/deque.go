@@ -1447,15 +1447,16 @@ func (it *BidiIter[T]) ToPtrChan(size int) <-chan *T {
 // TakeSlice collects up to n items to a slice, starting from the next
 // item. Returns an empty slice if the deque is empty.
 func (it *BidiIter[T]) TakeSlice(n int) []T {
-	if !it.HasNext() || n < 1 {
+	if n < 1 || !it.HasNext() {
 		return []T{}
 	}
 	res := make([]T, 0, numutil.MinInt(it.d.len, n))
-	i := 0
-	for v, ok := it.Peek(); ok && i < n; v, ok = it.Peek() {
+	for i := 0; i < n; i++ {
+		v, ok := it.Next()
+		if !ok {
+			break
+		}
 		res = append(res, v)
-		_, _ = it.Next()
-		i++
 	}
 	if len(res) == 0 { // defensive check, should never be true.
 		return []T{}
@@ -1466,15 +1467,16 @@ func (it *BidiIter[T]) TakeSlice(n int) []T {
 // TakePtrSlice collects up to n items to a slice, starting from the next
 // item. Returns an empty slice if the deque is empty.
 func (it *BidiIter[T]) TakePtrSlice(n int) []*T {
-	if !it.HasNext() || n < 1 {
+	if n < 1 || !it.HasNext() {
 		return []*T{}
 	}
 	res := make([]*T, 0, numutil.MinInt(it.d.len, n))
-	i := 0
-	for v, ok := it.PeekPtr(); ok && i < n; v, ok = it.PeekPtr() {
+	for i := 0; i < n; i++ {
+		v, ok := it.NextPtr()
+		if !ok {
+			break
+		}
 		res = append(res, v)
-		_, _ = it.Next()
-		i++
 	}
 	if len(res) == 0 { // defensive check, should never be true.
 		return []*T{}

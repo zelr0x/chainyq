@@ -794,8 +794,9 @@ func TestBidiIterNavigation(t *testing.T) {
 		AssertEqOk(t, slice[0], val, ok, "Peek should show first item without advancing")
 		val, ok = it.Next()
 		AssertEqOk(t, slice[0], val, ok, "Next should advance into first item")
+		AssertTrue(t, it.HasPrev(), "HasPrev after first next should be true")
 		val, ok = it.PeekBack()
-		AssertEqOk(t, slice[0], val, ok, "PeekPrev should give the item we just traversed")
+		AssertEqOk(t, slice[0], val, ok, "PeekBack should give the item we just traversed")
 
 		val, ok = it.Next()
 		AssertEqOk(t, slice[1], val, ok, "Next should advance further")
