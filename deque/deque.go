@@ -29,7 +29,6 @@ import (
 const (
 	defCapBlocksEachSide int = 8
 	defPoolInitCap       int = 32
-	defPoolPrealloc      int = 0
 	takeWhileInitCap         = 32
 )
 
@@ -49,18 +48,7 @@ type DequeCfg struct {
 	// as preallocating the blocks themselves. For that use [EnsureFront]
 	// and [EnsureBack] after creation.
 	BackCap int
-	// PoolPrealloc defines the number of items to account for in the pool.
-	// By default it's 0. This is useful if you are ok to preallocate some
-	// memory but don't know how many items you will push and at which side.
-	// At least PoolPreallocItems pushes at any side will be possible before
-	// the first allocation.
-	PoolPreallocItems int
-	// Pooled specifies if object pool should be used. Currently deque
-	// uses a custom pool with no synchronization overhead, so the main cost
-	// for using this is longer-lived objects and pointer operations like
-	// [FrontPtr] and [BackPtr] becoming unsafe - you have to use those
-	// immediately, because when the block is reclaimed the memory those
-	// pointers point to can be reused.
+	// Pooled specifies if object pool should be used. See [PreallocPool]
 	Pooled bool
 }
 
@@ -88,8 +76,6 @@ type Deque[T any] struct {
 	blockCfg                    // immutable, 24 bytes on x64
 	a             dequeAlloc[T] // immutable, internal state, 40 bytes on x64
 	initCfg       initCfg       // immutable, 24 bytes on x64
-
-	// Whole struct is ~152 bytes, still cheap to copy.
 }
 
 // Iter is a bidirectional iterator for [Deque]. The iterator is invalidated
@@ -167,33 +153,23 @@ func WithCfg[T any](cfg DequeCfg) *Deque[T] {
 // This is meant for advanced use cases, most users should use [New]
 // and [WithCfg] to create a *Deque[T].
 func NewValue[T any](cfg DequeCfg) Deque[T] {
-	initCfg := newInitCfg(cfg)
 	blockSize := cfg.BlockSize
 	if blockSize < 4 {
 		blockSize = 4
 	} else {
 		blockSize = int(numutil.RoundNextPow2(uint(blockSize)))
 	}
-
+	cfg.BlockSize = blockSize // for newInitCfg
 	if cfg.FrontCap < defCapBlocksEachSide {
 		cfg.FrontCap = defCapBlocksEachSide
 	}
 	if cfg.BackCap < defCapBlocksEachSide {
 		cfg.BackCap = defCapBlocksEachSide
 	}
-	poolInitCap := 0
-	if cfg.Pooled {
-		poolInitCap = defPoolInitCap
-		if cfg.PoolPreallocItems <= 0 {
-			cfg.PoolPreallocItems = defPoolPrealloc
-		}
-	}
-
+	initCfg := newInitCfg(cfg)
 	a := newDequeAlloc[T](dequeAllocCfg{
-		pooled:        cfg.Pooled,
-		blockSize:     blockSize,
-		initCap:       poolInitCap,
-		preallocItems: cfg.PoolPreallocItems,
+		blockSize: blockSize,
+		pooled:     cfg.Pooled,
 	})
 	dequeState := dequeState[T]{}
 	blockCfg := blockCfg{
@@ -622,6 +598,17 @@ func (d *Deque[T]) EnsureBack(items int) {
 		}
 		remaining -= blockSize
 	}
+}
+
+// Preallocates enough blocks for the specified number of items in the pool.
+// Returns true on success, false otherwise (if pooling is disabled).
+func (d *Deque[T]) PreallocPool(items int) bool {
+	if !d.a.pooled {
+		return false
+	}
+	n := blocksForCapCeil(d.blockSize, items)
+	d.a.PreallocBlocks(n)
+	return true
 }
 
 // ShrinkToFit shrinks the deque to the max of (used blocks, sun of initially

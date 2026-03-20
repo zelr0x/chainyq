@@ -63,7 +63,7 @@ func (di DequeIntrospector[T]) Map() [][]T {
 // Alloc returns whether the deque is pooled and its block size.
 // You can expose more alloc info here if needed.
 func (di DequeIntrospector[T]) AllocInfo() (pooled bool, blockSize int) {
-	return di.d.a.pooled, di.d.a.blockSize
+	return di.d.a.pooled, di.d.blockSize
 }
 
 // InitConfig exposes scalar fields from initCfg

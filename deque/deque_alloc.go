@@ -14,77 +14,66 @@
 
 package deque
 
+import (
+	"github.com/zelr0x/chainyq/stack"
+)
+
 // separating dequeAlloc and blockAlloc allows swapping impls
 // or hybrid strategies with multiple allocators.
 type dequeAlloc[T any] struct {
-	ba        blockAlloc[T]
+	pool      stack.Stack[[]T]
 	blockSize int
 	pooled    bool
 }
 
 type dequeAllocCfg struct {
-	blockSize     int
-	initCap       int
-	preallocItems int
-	pooled        bool
+	blockSize int
+	pooled    bool
 }
 
 func newDequeAlloc[T any](cfg dequeAllocCfg) dequeAlloc[T] {
-	preallocBlocks := 0
-	if cfg.preallocItems > 0 {
-		preallocBlocks = blocksForCapCeil(cfg.blockSize, cfg.preallocItems)
-	}
-	ba := newBlockAlloc[T](blockAllocCfg{
-		blockSize:      cfg.blockSize,
-		initCap:        cfg.initCap,
-		preallocBlocks: preallocBlocks,
-	})
-	return dequeAlloc[T]{
+	blockSize := cfg.blockSize
+	a := dequeAlloc[T]{
+		blockSize: blockSize,
 		pooled:    cfg.pooled,
-		blockSize: cfg.blockSize,
-		ba:        ba,
+	}
+	if cfg.pooled {
+		a.pool = stack.NewValue[[]T](16)
+	}
+	return a
+}
+
+// Should not be called if not pooled.
+func (a *dequeAlloc[T]) PreallocBlocks(n int) {
+	a.pool.Ensure(n)
+	blockSize := a.blockSize
+	for range n {
+		a.pool.Push(Allocate[T](blockSize))
 	}
 }
 
 func (a *dequeAlloc[T]) NewBlock() []T {
-	if a.pooled {
-		block, ok := a.ba.NewBlock()
-		if ok {
-			return block
-		}
+	if !a.pooled {
+		return Allocate[T](a.blockSize)
 	}
-	return a.allocate()
-}
-
-// It is a separate function to distinguish it easier during profiling.
-// The call should be inlined in all cases, so not a big deal.
-func (a *dequeAlloc[T]) allocate() []T {
-	return make([]T, a.blockSize)
+	v, ok := a.pool.Pop()
+	if !ok {
+		return Allocate[T](a.blockSize)
+	}
+	return v
 }
 
 // Should not be called if not pooled.
 func (a *dequeAlloc[T]) ReclaimBlock(block []T) {
-	if !a.pooled {
-		return
-	}
-	a.ba.Reclaim(block)
-}
-
-// Should not be called if not pooled.
-func (a *dequeAlloc[T]) ReclaimChunk(chunk [][]T) {
-	if !a.pooled {
-		return
-	}
-	for _, v := range chunk {
-		if v != nil {
-			a.ba.Reclaim(v)
-		}
-	}
+	a.pool.Push(block)
 }
 
 func (a *dequeAlloc[T]) ReleaseAll() {
-	if !a.pooled {
-		return
+	if a.pooled {
+		a.pool.Clear()
 	}
-	a.ba.ReleaseAll()
+}
+
+func Allocate[T any](blockSize int) []T {
+	return make([]T, blockSize)
 }
