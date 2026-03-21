@@ -50,7 +50,7 @@ go get github.com/zelr0x/chainyq
 
 ### Benchmarks
 
-The following benchmarks highlight common workloads for Deque[T].
+The following benchmarks highlight common workloads for deques.
 
 #### TL;DR:
 - Fastest overall: chainyq.Deque
