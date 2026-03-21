@@ -17,5 +17,5 @@ package unsafeutil
 import "unsafe"
 
 func At[T any](base *T, i int) *T {
-    return (*T)(unsafe.Add(unsafe.Pointer(base), uintptr(i)*unsafe.Sizeof(*base)))
+	return (*T)(unsafe.Add(unsafe.Pointer(base), uintptr(i)*unsafe.Sizeof(*base)))
 }

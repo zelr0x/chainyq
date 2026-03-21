@@ -304,10 +304,10 @@ func RandomIntSliceN(t *testing.T, size, intn int) []int {
 }
 
 func IsNil[T any](x T) bool {
-    v := reflect.ValueOf(x)
-    switch v.Kind() {
-    case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func:
-        return v.IsNil()
-    }
-    return false
+	v := reflect.ValueOf(x)
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Slice, reflect.Map, reflect.Chan, reflect.Func:
+		return v.IsNil()
+	}
+	return false
 }

@@ -34,7 +34,7 @@ type Stack[T any] struct {
 }
 
 type Iter[T any] struct {
-	s []T
+	s   []T
 	cur int // index in the underlying slice just after the next item
 }
 
@@ -241,7 +241,7 @@ func (s *Stack[T]) ToSlice() []T {
 		return []T{}
 	}
 	res := make([]T, 0, n)
-	for i := n-1; i >= 0; i-- {
+	for i := n - 1; i >= 0; i-- {
 		res = append(res, b[i])
 	}
 	return res

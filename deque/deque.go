@@ -169,7 +169,7 @@ func NewValue[T any](cfg DequeCfg) Deque[T] {
 	initCfg := newInitCfg(cfg)
 	a := newDequeAlloc[T](dequeAllocCfg{
 		blockSize: blockSize,
-		pooled:     cfg.Pooled,
+		pooled:    cfg.Pooled,
 	})
 	dequeState := dequeState[T]{}
 	blockCfg := blockCfg{
