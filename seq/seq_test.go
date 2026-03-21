@@ -92,23 +92,23 @@ func TestFilter(t *testing.T) {
 }
 
 func TestTake(t *testing.T) {
-    tests := []struct {
-        name string
-        n    int
-        want []int
-    }{
-        {"negative take", -5, []int{}},
-        {"zero take", 0, []int{}},
-        {"take one", 1, []int{1}},
-        {"take more than length", 100, SliceFromRangeIncl(t, 1, 10)},
-    }
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            s := seq.FromSlice(SliceFromRangeIncl(t, 1, 10))
-            got := s.Take(tt.n).ToSlice()
-            AssertSliceEq(t, tt.want, got)
-        })
-    }
+	tests := []struct {
+		name string
+		n    int
+		want []int
+	}{
+		{"negative take", -5, []int{}},
+		{"zero take", 0, []int{}},
+		{"take one", 1, []int{1}},
+		{"take more than length", 100, SliceFromRangeIncl(t, 1, 10)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := seq.FromSlice(SliceFromRangeIncl(t, 1, 10))
+			got := s.Take(tt.n).ToSlice()
+			AssertSliceEq(t, tt.want, got)
+		})
+	}
 }
 
 func TestSkip(t *testing.T) {
@@ -136,6 +136,14 @@ func TestMap(t *testing.T) {
 		return strconv.Itoa(x)
 	}).ToSlice()
 	AssertSliceEq(t, []string{"0", "1", "2"}, got)
+}
+
+func TestFlatMap(t *testing.T) {
+	s := seq.FromSlice([]int{1, 2, 3})
+	flat := seq.FlatMap(s, func(x int) seq.Seq[int] {
+		return seq.FromSlice([]int{x, x * 10})
+	}).ToSlice()
+	AssertSliceEq(t, []int{1, 10, 2, 20, 3, 30}, flat)
 }
 
 func TestSeqCount(t *testing.T) {
@@ -235,9 +243,9 @@ func TestToMapMerge(t *testing.T) {
 func TestGroupByHint(t *testing.T) {
 	s := seq.FromSlice([]string{"apple", "apricot", "banana"})
 	groups := seq.GroupByHint(s,
-    	func(s string) string { return string(s[0]) },
-    	2,
-    	2,
+		func(s string) string { return string(s[0]) },
+		2,
+		2,
 	)
 	a := groups["a"]
 	b := groups["b"]
@@ -256,14 +264,14 @@ func TestFold(t *testing.T) {
 func TestFoldr(t *testing.T) {
 	s := seq.FromSlice([]int{1, 2, 3})
 	res := seq.Foldr(s, 0, func(x int, rest func() int) int {
-	  	return x + rest()
+		return x + rest()
 	})
 	AssertEq(t, 6, res)
 
 	// Foldr should evaluate as 1 - (2 - (3 - 0)) = 2
 	s = seq.FromSlice([]int{1, 2, 3})
-    res = seq.Foldr(s, 0, func(x int, rest func() int) int {
-        return x - rest()
-    })
+	res = seq.Foldr(s, 0, func(x int, rest func() int) int {
+		return x - rest()
+	})
 	AssertEq(t, 2, res)
 }

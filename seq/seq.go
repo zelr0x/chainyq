@@ -110,6 +110,15 @@ func FromChan[T any](ch <-chan T) Seq[T] {
     })
 }
 
+// Empty creates an empty Seq. This is the same as var s Seq[T]
+// but nil-safe and clearly documents the intent.
+func Empty[T any]() Seq[T] {
+	return New(func() (T, bool) {
+        var zero T
+        return zero, false
+    })
+}
+
 func newTerminated[T any]() Seq[T] {
 	return New(func() (T, bool) {
 		var zero T
@@ -235,6 +244,33 @@ func Map[T any, R any](seq Seq[T], f func(T) R) Seq[R] {
 			return zero, false
 		}
 		return f(v), true
+	})
+}
+
+// FlatMap transforms each element of the sequence using the given function f,
+// which itself produces a subsequence, including each element of each such
+// subsequence into the resulting sequence.
+//
+// Example:
+//   s := seq.FromSlice([]int{1, 2, 3})
+//   flat := seq.FlatMap(s, func(x int) seq.Seq[int] {
+//   	return seq.FromSlice([]int{x, x * 10})
+//   }).ToSlice()  // [1 10 2 20 3 30]
+func FlatMap[T any, R any](seq Seq[T], f func(T) Seq[R]) Seq[R] {
+	inner := Empty[R]()
+	return New(func() (R, bool) {
+		for {
+			v, ok := inner.next()
+			if ok {
+				return v, ok
+			}
+			outer, ok := seq.Next()
+			if !ok {
+				var zero R
+				return zero, false
+			}
+			inner = f(outer)
+		}
 	})
 }
 
