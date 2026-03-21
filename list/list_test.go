@@ -691,7 +691,7 @@ func TestBidiIterRemoveAndInsert(t *testing.T) {
 
 	it.ResetBack()
 	val, ok = it.Remove()
-	AssertFalse(t, ok, "Remove after reset back should fail")
+	AssertZeroFalse(t, val, ok, "Remove after reset back should fail")
 	AssertFalse(t, it.InsertAfter(99), "InsertAfter after ResetBack should fail")
 
 	AssertSliceEq(t, []int{77, 1, 2, 3}, l.ToSlice())
@@ -699,7 +699,8 @@ func TestBidiIterRemoveAndInsert(t *testing.T) {
 	AssertTrue(t, it.InsertAfter(99), "InsertAfter after ResetBack Prev should work")
 	AssertSliceEq(t, []int{77, 1, 2, 3, 99}, l.ToSlice())
 	val, ok = it.Remove()
-	AssertSliceEq(t, []int{77, 1, 2, 99}, l.ToSlice(), "InsertAfter should not change the last traversed item")
+	AssertEqOk(t, 3, val, ok, "InsertAfter should not change the last traversed item - 1")
+	AssertSliceEq(t, []int{77, 1, 2, 99}, l.ToSlice(), "InsertAfter should not change the last traversed item - 2")
 }
 
 func TestIterForEachAndChannels(t *testing.T) {

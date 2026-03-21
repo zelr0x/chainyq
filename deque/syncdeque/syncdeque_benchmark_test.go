@@ -18,7 +18,6 @@ import "testing"
 
 func BenchmarkConcurrentPushPop(b *testing.B) {
 	d := New[int]()
-	const N = 1000
 
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0

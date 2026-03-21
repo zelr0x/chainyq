@@ -144,13 +144,13 @@ func TestEmptyOperations(t *testing.T) {
 	AssertEq(t, 0, val)
 
 	val, ok = d.Front()
-	AssertFalse(t, ok, "Front on empty")
+	AssertZeroFalse(t, val, ok, "Front on empty")
 
 	val, ok = d.Back()
-	AssertFalse(t, ok, "Back on empty")
+	AssertZeroFalse(t, val, ok, "Back on empty")
 
-	_, ok = d.Get(0)
-	AssertFalse(t, ok, "Get(0) on empty")
+	val, ok = d.Get(0)
+	AssertZeroFalse(t, val, ok, "Get(0) on empty")
 }
 
 func TestPushFrontAndPushBack(t *testing.T) {
