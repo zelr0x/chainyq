@@ -21,8 +21,8 @@ Currently available:
 - `Stack[T any]` - a slice-based stack
   - Fast `Push`, `Pop` and `Peek`
   - Top-down iterator
-- `Seq[T any]` - a lazy sequence
-  - `Filter`/`Map`/`Reduce`/`ForEach`/`GroupBy`/`ToMap`/etc.
+- `Seq[T any]` - extremely lightweight and simple lazy sequence
+  - `Filter`, `Map`, `FlatMap`, `Reduce`, `ForEach`, `ToSlice`, `GroupBy`, `ToMap`, etc.
   - Can be created from iterators, slices, and just functions
   - Supports lazy infinite sequences
 - `SyncDeque[T any]` - synchronized wrapper around `Deque[T]`
