@@ -69,6 +69,7 @@ The following benchmarks highlight common workloads for Deque[T].
 | chainyq.List               |   38.640 |   24 |         1 |
 | container.List             |   61.730 |   55 |         1 |
 
+
 | PushFront                  | ns/op    | B/op | allocs/op |
 |----------------------------|---------:|-----:|----------:|
 | chainyq.Deque              |    3.782 |    8 |         0 |
@@ -76,6 +77,7 @@ The following benchmarks highlight common workloads for Deque[T].
 | gammazero.Deque            |    4.732 |   17 |         0 |
 | chainyq.List               |   33.800 |   24 |         1 |
 | container.List             |   60.950 |   55 |         1 |
+
 
 | Random churn (int)         | ns/op    | B/op | allocs/op |
 |----------------------------|---------:|-----:|----------:|
@@ -85,25 +87,31 @@ The following benchmarks highlight common workloads for Deque[T].
 | chainyq.List               |   18.560 |   11 |         0 |
 | container.List             |   26.020 |   27 |         0 |
 
+
 | Random churn (big struct)  | ns/op    | B/op | allocs/op |
 |----------------------------|---------:|-----:|----------:|
 | chainyq.Deque              |    14.56 |    0 |         0 |
 | edwingeng.Deque            |    15.61 |    0 |         0 |
 | gammazero.Deque            |    15.06 |    0 |         0 |
 
+
 | Random access (get by index) | ns/op    | B/op | allocs/op |
 |------------------------------|---------:|-----:|----------:|
 | chainyq.Deque                |    9.127 |    0 |         0 |
 | edwingeng.Deque              |  2758.00 |    0 |         0 |
 | gammazero.Deque              |    8.606 |    0 |         0 |
+
 *Ring buffer should win here, but the gain is in the noise range*
+
 
 | Bursts of 100k writes/10k reads | ns/op    | B/op | allocs/op |
 |---------------------------------|---------:|-----:|----------:|
 | chainyq.Deque					  |    17.34 |    0 |         0 |
 | edwingeng.Deque				  |    19.90 |    0 |         0 |
 | gammazero.Deque				  |    36.05 |    0 |         0 |
+
 *Segmented array should win here*
+
 
 | Sliding window             | ns/op    | B/op | allocs/op |
 |----------------------------|---------:|-----:|----------:|
@@ -112,6 +120,7 @@ The following benchmarks highlight common workloads for Deque[T].
 | gammazero.Deque            |    17.07 |    0 |         0 |
 
 *Ring buffer should win here, but the gain is minimal*
+
 
 Across all benchmarks, `chainyq.Deque` has delivered excellent performance:
 - On small input sizes, its performance is virtually indistinguishable
