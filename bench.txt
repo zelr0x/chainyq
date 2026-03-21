@@ -28,7 +28,6 @@ BenchmarkChurn/gammazero.Deque-12                       100000000               
 BenchmarkChurn/chainyq.list.List-12                     58876922                18.56 ns/op           11 B/op          0 allocs/op
 BenchmarkChurn/container.list.List-12                   41795390                26.02 ns/op           27 B/op          0 allocs/op
 
-// Pooling is not always a win.
 BenchmarkChurnWithClear/chainyq.Deque-12                121147936                9.985 ns/op           0 B/op          0 allocs/op
 BenchmarkChurnWithClear/chainyq.Deque_Pooled-12         100000000               10.94 ns/op            0 B/op          0 allocs/op
 BenchmarkChurnWithClear/chainyq.Deque_PoolSmallPrealloc-12              100000000               10.05 ns/op            0 B/op          0 allocs/op
@@ -41,6 +40,14 @@ BenchmarkChurnBigStruct/chainyq.Deque-12                                81947061
 BenchmarkChurnBigStruct/edwingeng.Deque-12                              75064273                15.61 ns/op            0 B/op          0 allocs/op
 BenchmarkChurnBigStruct/gammazero.Deque-12                              79503368                15.06 ns/op            0 B/op          0 allocs/op
 
-BenchmarkRandomAccess/chainyq.Deque-12                                  77227034                28.67 ns/op            0 B/op          0 allocs/op
-BenchmarkRandomAccess/edwingeng.Deque-12                                 1000000              2808 ns/op               0 B/op          0 allocs/op
-BenchmarkRandomAccess/gammazero.Deque-12 -- DNF, hangs at b.N at the time of writing on my bench.
+BenchmarkRandomAccess/chainyq.Deque-12         	125091759	         9.127 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRandomAccess/edwingeng.Deque-12       	  380636	      2758 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRandomAccess/gammazero.Deque-12       	137865096	         8.606 ns/op	       0 B/op	       0 allocs/op
+
+BenchmarkBurstyQueue/chainyq.Deque-12               1000000000	        17.34 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBurstyQueue/edwingeng.Deque-12             1000000000	        19.90 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBurstyQueue/gammazero.Deque-12             1000000000	        36.05 ns/op	       2 B/op	       0 allocs/op
+
+BenchmarkSlidingWindowMax/chainyq.Deque-12         	1000000000	        18.16 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSlidingWindowMax/edwingeng.Deque-12       	1000000000	        19.95 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSlidingWindowMax/gammazero.Deque-12       	1000000000	        17.07 ns/op	       0 B/op	       0 allocs/op

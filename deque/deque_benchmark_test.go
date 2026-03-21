@@ -17,6 +17,7 @@ package deque
 import (
 	stdlist "container/list"
 	"testing"
+	"time"
 
 	. "github.com/zelr0x/chainyq/internal/benchutil"
 
@@ -373,13 +374,12 @@ func BenchmarkChurnWithClear(b *testing.B) {
 		a := RandomIntSlice(b, seed, 4)
 		maxLen := max(1024, b.N/10)
 		d := WithCfg[int](DequeCfg{
-			BlockSize:         SuggestBlockSize[int](),
-			FrontCap:          8,
-			BackCap:           8,
-			Pooled:            true,
-			PoolPreallocItems: max(100, b.N/30), // intentionally preallocate less than needed
+			BlockSize: SuggestBlockSize[int](),
+			FrontCap:  8,
+			BackCap:   8,
+			Pooled:    true,
 		})
-		// b.N/3 instead of b.N/4 to have some slack for consistency
+		d.PreallocPool(max(100, b.N/30)) // intentionally preallocate less than needed
 		var sink int
 		b.ResetTimer()
 		for i := range b.N {
@@ -585,79 +585,245 @@ func BenchmarkChurnBigStruct(b *testing.B) {
 }
 
 func BenchmarkRandomAccess(b *testing.B) {
+	N := 1_000_000
+	a := RandomIntSliceN(b, seed, N, N)
+
 	b.Run("chainyq.Deque", func(b *testing.B) {
-		a := RandomIntSlice(b, seed, b.N)
 		d := New[int]()
-		for i := range b.N {
+		for i := range N {
 			d.PushBack(i)
 		}
-		var sink int
 		b.ResetTimer()
-		for i := range b.N {
-			target := a[i]
+		var sink int
+		j := 0
+		for range b.N {
+			target := a[j]
 			x, _ := d.Get(target)
 			sink = x
+			j++
+			if j == N {
+				j = 0
+			}
 		}
 		Sink = sink
 	})
+
 	b.Run("edwingeng.Deque", func(b *testing.B) {
-		a := RandomIntSlice(b, seed, b.N)
 		d := ed.NewDeque[int]()
-		for i := range b.N {
+		for i := range N {
 			d.PushBack(i)
 		}
-		var sink int
 		b.ResetTimer()
-		for i := range b.N {
-			target := a[i]
+		var sink int
+		j := 0
+		for range b.N {
+			target := a[j]
 			x := d.Peek(target)
 			sink = x
+			j++
+			if j == N {
+				j = 0
+			}
 		}
 		Sink = sink
 	})
-	// This just hogs all the resources and hangs for some reason on large b.N
-	// b.Run("gammazero.Deque", func(b *testing.B) {
-	// 	a := RandomIntSlice(b, seed, b.N)
-	// 	var d gz.Deque[int]
-	// 	for i := range b.N {
-	// 		d.PushBack(i)
-	// 	}
-	// 	b.ResetTimer()
-	// 	for i := range b.N {
-	// 		target := a[i]
-	// 		_ = d.At(target)
-	// 	}
-	// })
 
-	// This works but is slow, as expected.
-	// b.Run("chainyq.list.List", func(b *testing.B) {
-	// 	a := RandomIntSliceN(b, seed, N, N)
-	// 	d := list.New[int]()
-	// 	for i := range N {
-	// 		d.PushFront(i)
-	// 	}
-	// 	b.ResetTimer()
-	// 	for i := range N {
-	// 		target := a[i]
-	// 		d.Get(target)
-	// 	}
-	// })
+	b.Run("gammazero.Deque", func(b *testing.B) {
+		var d gz.Deque[int]
+		for i := range N {
+			d.PushBack(i)
+		}
+		b.ResetTimer()
+		var sink int
+		j := 0
+		for range b.N {
+			target := a[j]
+			x := d.At(target)
+			sink = x
+			j++
+			if j == N {
+				j = 0
+			}
+		}
+		Sink = sink
+	})
+}
 
-	// This one is better not start as well, very slow.
-	// b.Run("container.list.List", func(b *testing.B) {
-	// 	a := RandomIntSliceN(b, seed, N, N)
-	// 	d := stdlist.New()
-	// 	for i := range N {
-	// 		d.PushFront(i)
-	// 	}
-	// 	b.ResetTimer()
-	// 	for i := range N {
-	// 		target := a[i]
-	// 		e := d.Front()
-	// 		for range target {
-	// 			e = e.Next()
-	// 		}
-	// 		_ = e.Value
-	// 	}
-	// })
+func BenchmarkBurstyQueue(b *testing.B) {
+	type Event struct {
+		ID   int
+		Data [64]byte
+	}
+	const bursts = 100
+	const writes = 100_000
+	const reads = writes / 10
+	totalOps := bursts*writes + bursts*reads
+	b.Run("chainyq.Deque", func(b *testing.B) {
+		d := New[Event]()
+		var sink int
+		b.ResetTimer()
+		start := time.Now()
+		for range bursts {
+			for j := range writes {
+				d.PushBack(Event{ID: j})
+			}
+			for range reads {
+				v, ok := d.PopFront()
+				if ok {
+					sink = v.ID
+				}
+			}
+		}
+		elapsed := time.Since(start)
+		b.ReportMetric(float64(elapsed.Nanoseconds())/float64(totalOps), "ns/op")
+		Sink = sink
+	})
+
+	b.Run("edwingeng.Deque", func(b *testing.B) {
+		d := ed.NewDeque[Event]()
+		var sink int
+		b.ResetTimer()
+		start := time.Now()
+		for range bursts {
+			for j := range writes {
+				d.PushBack(Event{ID: j})
+			}
+			for range reads {
+				v, ok := d.TryPopFront()
+				if ok {
+					sink = v.ID
+				}
+			}
+		}
+		elapsed := time.Since(start)
+		b.ReportMetric(float64(elapsed.Nanoseconds())/float64(totalOps), "ns/op")
+		Sink = sink
+	})
+
+	b.Run("gammazero.Deque", func(b *testing.B) {
+		var d gz.Deque[Event]
+		var sink int
+		b.ResetTimer()
+		start := time.Now()
+		for range bursts {
+			for j := range writes {
+				d.PushBack(Event{ID: j})
+			}
+			for range reads {
+				if d.Len() > 0 {
+					v := d.PopFront()
+					sink = v.ID
+				}
+			}
+		}
+		elapsed := time.Since(start)
+		b.ReportMetric(float64(elapsed.Nanoseconds())/float64(totalOps), "ns/op")
+		Sink = sink
+	})
+}
+
+func BenchmarkSlidingWindowMax(b *testing.B) {
+	const N = 1_000_000
+	const W = 1024
+	const R = 10
+	data := RandomIntSliceN(b, seed, N, N)
+
+	b.Run("chainyq.Deque", func(b *testing.B) {
+		d := New[int]()
+		b.ResetTimer()
+		var elapsedTotal time.Duration
+		var sink int
+		for range R {
+			start := time.Now()
+			for i := range N {
+				for d.Len() > 0 {
+					back, _ := d.Back()
+					if data[back] >= data[i] {
+						break
+					}
+					d.PopBack()
+				}
+				d.PushBack(i)
+				front, _ := d.Front()
+				if front <= i-W {
+					d.PopFront()
+				}
+				if i >= W {
+					x := data[front]
+					sink += x
+				}
+			}
+			elapsed := time.Since(start)
+			elapsedTotal += elapsed
+			Sink = sink
+		}
+		elapsed := elapsedTotal / R
+		b.ReportMetric(float64(elapsed.Nanoseconds())/float64(N), "ns/op")
+	})
+
+	b.Run("edwingeng.Deque", func(b *testing.B) {
+		d := ed.NewDeque[int]()
+		b.ResetTimer()
+		var elapsedTotal time.Duration
+		var sink int
+		for range R {
+			start := time.Now()
+			for i := range N {
+				for d.Len() > 0 {
+					back, _ := d.Back()
+					if data[back] >= data[i] {
+						break
+					}
+					d.PopBack()
+				}
+				d.PushBack(i)
+				front, _ := d.Front()
+				if front <= i-W {
+					d.PopFront()
+				}
+				if i >= W {
+					x := data[front]
+					sink += x
+				}
+			}
+			elapsed := time.Since(start)
+			elapsedTotal += elapsed
+			Sink = sink
+		}
+		elapsed := elapsedTotal / R
+		b.ReportMetric(float64(elapsed.Nanoseconds())/float64(N), "ns/op")
+	})
+
+	b.Run("gammazero.Deque", func(b *testing.B) {
+		var d gz.Deque[int]
+		b.ResetTimer()
+		var elapsedTotal time.Duration
+		var sink int
+		for range R {
+			start := time.Now()
+			for i := range N {
+				for d.Len() > 0 {
+					back := d.Back()
+					if data[back] >= data[i] {
+						break
+					}
+					d.PopBack()
+				}
+				d.PushBack(i)
+				front := d.Front()
+				if front <= i-W {
+					d.PopFront()
+				}
+				if i >= W {
+					x := data[front]
+					sink += x
+				}
+			}
+			elapsed := time.Since(start)
+			elapsedTotal += elapsed
+			Sink = sink
+		}
+		elapsed := elapsedTotal / R
+		b.ReportMetric(float64(elapsed.Nanoseconds())/float64(N), "ns/op")
+	})
 }
