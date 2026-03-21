@@ -987,3 +987,19 @@ func AssertDequeInvariant[T any](t *testing.T, d *Deque[T]) {
 		AssertNotNil(t, d.m[i], fmt.Sprintf("block %d is nil but should exist", i))
 	}
 }
+
+func TestDequeExample1(t *testing.T) {
+	d := FromSlice([]int{2, 4, 8, 16})
+	v, ok := d.PopBack()
+	AssertEqOk(t, 16, v, ok)
+	d.PushFront(1)
+	if v, ok := d.PopFront(); ok {
+		AssertEq(t, 1, v)
+	}
+	AssertSliceEq(t, []int{2, 4, 8}, d.ToSlice())
+	d.Iter().Skip(1).ForEachPtr(func(x *int) bool {
+		*x *= 10
+		return true
+	})
+	AssertSliceEq(t, []int{2, 40, 80}, d.ToSlice())
+}

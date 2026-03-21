@@ -30,33 +30,33 @@ type Seq[T any] struct {
 //
 // Example: finite seq from slice
 //
-//   xs := []int{1, 2, 3}
-//   i := 0
-//   s := seq.New(func() (int, bool) {
-//   	if i >= len(xs) {
-//   		return 0, false
-//   	}
-//   	v := xs[i]
-//   	i++
-//   	return v, true
-//   })
-//   s.ToSlice()  // []int{1, 2, 3}
+//	xs := []int{1, 2, 3}
+//	i := 0
+//	s := seq.New(func() (int, bool) {
+//		if i >= len(xs) {
+//			return 0, false
+//		}
+//		v := xs[i]
+//		i++
+//		return v, true
+//	})
+//	s.ToSlice()  // []int{1, 2, 3}
 //
 // Example: infinite seq from a counter variable
 //
-//   i := 0
-//   s := seq.New(func() (int, bool) {
-//   	i++
-//   	return i, true
-//   })
-//   s.Take(5).ToSlice()  // []int{1, 2, 3, 4, 5}
+//	i := 0
+//	s := seq.New(func() (int, bool) {
+//		i++
+//		return i, true
+//	})
+//	s.Take(5).ToSlice()  // []int{1, 2, 3, 4, 5}
 //
 // Example: infinite seq from RNG
 //
-//   s := seq.New(func() (int, bool) {
-//   	return rand.Intn(100), true
-//   })
-//   s.Take(5).ToSlice()  // []int{42, 7, 88, 13, 56} (random values)
+//	s := seq.New(func() (int, bool) {
+//		return rand.Intn(100), true
+//	})
+//	s.Take(5).ToSlice()  // []int{42, 7, 88, 13, 56} (random values)
 func New[T any](next func() (T, bool)) Seq[T] {
 	return Seq[T]{next: next}
 }
@@ -64,7 +64,7 @@ func New[T any](next func() (T, bool)) Seq[T] {
 // Creates a new Seq from the specified slice.
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3, 4})
+//	s := seq.FromSlice([]int{1, 2, 3, 4})
 func FromSlice[T any](slice []T) Seq[T] {
 	if len(slice) == 0 {
 		return newTerminated[T]()
@@ -86,37 +86,37 @@ func FromSlice[T any](slice []T) Seq[T] {
 //
 // Example: wrap an existing channel
 //
-//   ch := make(chan int, 3)
-//   ch <- 1; ch <- 2; ch <- 3
-//   close(ch)
-//   s := seq.FromChan(ch)
-//   s.ToSlice()  // []int{1, 2, 3}
+//	ch := make(chan int, 3)
+//	ch <- 1; ch <- 2; ch <- 3
+//	close(ch)
+//	s := seq.FromChan(ch)
+//	s.ToSlice()  // []int{1, 2, 3}
 //
 // Example: use with a producer goroutine
 //
-//   ch := make(chan string)
-//   go func() {
-//   	defer close(ch)
-//   	for _, s := range []string{"a", "b", "c"} {
-//   		ch <- s
-//   	}
-//   }()
-//   s := seq.FromChan(ch)
-//   s.ToSlice()  // []string{"a", "b", "c"}
+//	ch := make(chan string)
+//	go func() {
+//		defer close(ch)
+//		for _, s := range []string{"a", "b", "c"} {
+//			ch <- s
+//		}
+//	}()
+//	s := seq.FromChan(ch)
+//	s.ToSlice()  // []string{"a", "b", "c"}
 func FromChan[T any](ch <-chan T) Seq[T] {
-    return New(func() (T, bool) {
-        v, ok := <-ch
-        return v, ok
-    })
+	return New(func() (T, bool) {
+		v, ok := <-ch
+		return v, ok
+	})
 }
 
 // Empty creates an empty Seq. This is the same as var s Seq[T]
 // but nil-safe and clearly documents the intent.
 func Empty[T any]() Seq[T] {
 	return New(func() (T, bool) {
-        var zero T
-        return zero, false
-    })
+		var zero T
+		return zero, false
+	})
 }
 
 func newTerminated[T any]() Seq[T] {
@@ -130,10 +130,10 @@ func newTerminated[T any]() Seq[T] {
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2})
-//   s.Next()  // 1, true
-//   s.Next()  // 2, true
-//   s.Next()  // 0, false
+//	s := seq.FromSlice([]int{1, 2})
+//	s.Next()  // 1, true
+//	s.Next()  // 2, true
+//	s.Next()  // 0, false
 func (seq Seq[T]) Next() (T, bool) {
 	return seq.next()
 }
@@ -143,9 +143,9 @@ func (seq Seq[T]) Next() (T, bool) {
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3, 4})
-//   evens := s.Filter(func(x int) bool { return x % 2 == 0 })
-//   evens.ToSlice()  // []int{2, 4}
+//	s := seq.FromSlice([]int{1, 2, 3, 4})
+//	evens := s.Filter(func(x int) bool { return x % 2 == 0 })
+//	evens.ToSlice()  // []int{2, 4}
 func (seq Seq[T]) Filter(pred func(T) bool) Seq[T] {
 	return New(func() (T, bool) {
 		for v, ok := seq.next(); ok; v, ok = seq.next() {
@@ -163,8 +163,8 @@ func (seq Seq[T]) Filter(pred func(T) bool) Seq[T] {
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3, 4})
-//   firstTwo := s.Take(2).ToSlice()  // []int{1, 2}
+//	s := seq.FromSlice([]int{1, 2, 3, 4})
+//	firstTwo := s.Take(2).ToSlice()  // []int{1, 2}
 func (seq Seq[T]) Take(n int) Seq[T] {
 	if n < 1 {
 		return newTerminated[T]()
@@ -190,8 +190,8 @@ func (seq Seq[T]) Take(n int) Seq[T] {
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3, 4})
-//   rest := s.Skip(2).ToSlice()  // []int{3, 4}
+//	s := seq.FromSlice([]int{1, 2, 3, 4})
+//	rest := s.Skip(2).ToSlice()  // []int{3, 4}
 func (seq Seq[T]) Skip(n int) Seq[T] {
 	count := 0
 	return New(func() (T, bool) {
@@ -212,9 +212,9 @@ func (seq Seq[T]) Skip(n int) Seq[T] {
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3, 4})
-//   rest := s.SkipWhile(func(x int) bool { return x < 3 })
-//   rest.ToSlice()  // []int{3, 4}
+//	s := seq.FromSlice([]int{1, 2, 3, 4})
+//	rest := s.SkipWhile(func(x int) bool { return x < 3 })
+//	rest.ToSlice()  // []int{3, 4}
 func (seq Seq[T]) SkipWhile(pred func(T) bool) Seq[T] {
 	return New(func() (T, bool) {
 		for v, ok := seq.next(); ok; v, ok = seq.next() {
@@ -233,9 +233,9 @@ func (seq Seq[T]) SkipWhile(pred func(T) bool) Seq[T] {
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3})
-//   doubled := Map(s, func(x int) int { return x * 2 })
-//   doubled.ToSlice()  // []int{2, 4, 6}
+//	s := seq.FromSlice([]int{1, 2, 3})
+//	doubled := Map(s, func(x int) int { return x * 2 })
+//	doubled.ToSlice()  // []int{2, 4, 6}
 func Map[T any, R any](seq Seq[T], f func(T) R) Seq[R] {
 	return New(func() (R, bool) {
 		v, ok := seq.next()
@@ -252,10 +252,11 @@ func Map[T any, R any](seq Seq[T], f func(T) R) Seq[R] {
 // subsequence into the resulting sequence.
 //
 // Example:
-//   s := seq.FromSlice([]int{1, 2, 3})
-//   flat := seq.FlatMap(s, func(x int) seq.Seq[int] {
-//   	return seq.FromSlice([]int{x, x * 10})
-//   }).ToSlice()  // [1 10 2 20 3 30]
+//
+//	s := seq.FromSlice([]int{1, 2, 3})
+//	flat := seq.FlatMap(s, func(x int) seq.Seq[int] {
+//		return seq.FromSlice([]int{x, x * 10})
+//	}).ToSlice()  // [1 10 2 20 3 30]
 func FlatMap[T any, R any](seq Seq[T], f func(T) Seq[R]) Seq[R] {
 	inner := Empty[R]()
 	return New(func() (R, bool) {
@@ -278,7 +279,7 @@ func FlatMap[T any, R any](seq Seq[T], f func(T) Seq[R]) Seq[R] {
 // Returns the count on finite sequences, hangs on infinite sequences.
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3}).Count()  // 3
+//	s := seq.FromSlice([]int{1, 2, 3}).Count()  // 3
 func (seq Seq[T]) Count() int {
 	var count int
 	seq.ForEach(func(x T) {
@@ -291,7 +292,7 @@ func (seq Seq[T]) Count() int {
 // Returns the count on finite sequences, hangs on infinite sequences.
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3}).CountU64()  // 3 (uint64)
+//	s := seq.FromSlice([]int{1, 2, 3}).CountU64()  // 3 (uint64)
 func (seq Seq[T]) CountU64() uint64 {
 	var count uint64
 	seq.ForEach(func(x T) {
@@ -305,10 +306,10 @@ func (seq Seq[T]) CountU64() uint64 {
 //
 // Example:
 //
-//   seq.FromSlice([]int{1, 2, 3}).
-// 		ForEach(func(x int) {
-//      	fmt.Println(x)
-//   	})
+//	  seq.FromSlice([]int{1, 2, 3}).
+//			ForEach(func(x int) {
+//	     	fmt.Println(x)
+//	  	})
 func (seq Seq[T]) ForEach(f func(T)) {
 	for v, ok := seq.next(); ok; v, ok = seq.next() {
 		f(v)
@@ -320,11 +321,11 @@ func (seq Seq[T]) ForEach(f func(T)) {
 //
 // Example:
 //
-//   seq.FromSlice([]int{1, 2, 3, 4}).
-//   	ForEachUntil(func(x int) bool {
-//      	fmt.Println(x)
-//      	return x < 3 // stop once x >= 3, 3 will be printed
-//   	})
+//	seq.FromSlice([]int{1, 2, 3, 4}).
+//		ForEachUntil(func(x int) bool {
+//	   	fmt.Println(x)
+//	   	return x < 3 // stop once x >= 3, 3 will be printed
+//		})
 func (seq Seq[T]) ForEachUntil(f func(T) bool) {
 	for v, ok := seq.next(); ok; v, ok = seq.next() {
 		if !f(v) {
@@ -338,13 +339,13 @@ func (seq Seq[T]) ForEachUntil(f func(T) bool) {
 //
 // Example:
 //
-//   seq.FromSlice([]string{"a", "b", "c"}).
-//   	ForEachIndexed(func(i int, s string) bool {
-//   		fmt.Printf("%d: %s\n", i, s)
-//   		return true
-//   	})
+//	seq.FromSlice([]string{"a", "b", "c"}).
+//		ForEachIndexed(func(i int, s string) bool {
+//			fmt.Printf("%d: %s\n", i, s)
+//			return true
+//		})
 func (seq Seq[T]) ForEachIndexed(f func(int, T) bool) {
-	i := 0;
+	i := 0
 	for v, ok := seq.next(); ok; v, ok = seq.next() {
 		if !f(i, v) {
 			return
@@ -357,7 +358,7 @@ func (seq Seq[T]) ForEachIndexed(f func(int, T) bool) {
 //
 // Example:
 //
-//   seq.FromSlice([]int{1, 2, 3}).ToSlice()  // []int{1, 2, 3}
+//	seq.FromSlice([]int{1, 2, 3}).ToSlice()  // []int{1, 2, 3}
 func (seq Seq[T]) ToSlice() []T {
 	res := make([]T, 0, 16)
 	seq.ForEach(func(x T) {
@@ -366,16 +367,15 @@ func (seq Seq[T]) ToSlice() []T {
 	return res
 }
 
-
 // ToChan drains the sequence into a channel of size `size`.
 // The channel is closed once all elements are sent.
 //
 // Example:
 //
-//   ch := seq.FromSlice([]int{1, 2, 3}).ToChan(0)
-//   for x := range ch {
-//   	fmt.Println(x)
-//   }
+//	ch := seq.FromSlice([]int{1, 2, 3}).ToChan(0)
+//	for x := range ch {
+//		fmt.Println(x)
+//	}
 func (seq Seq[T]) ToChan(size int) <-chan T {
 	ch := make(chan T, size)
 	go func() {
@@ -394,13 +394,13 @@ func (seq Seq[T]) ToChan(size int) <-chan T {
 //
 // Example:
 //
-//   s := seq.FromSlice([]string{"apple", "apricot", "banana"})
-//   m := seq.ToMap(s,
-//   	func(s string) string { return string(s[0]) },
-//   	func(s string) string { return s },
-//   )
-//   m["a"]  // "apricot", since it is after "apple" in the sequence source
-//   m["b"]  // "banana"
+//	s := seq.FromSlice([]string{"apple", "apricot", "banana"})
+//	m := seq.ToMap(s,
+//		func(s string) string { return string(s[0]) },
+//		func(s string) string { return s },
+//	)
+//	m["a"]  // "apricot", since it is after "apple" in the sequence source
+//	m["b"]  // "banana"
 func ToMap[T any, K comparable, V any](
 	seq Seq[T],
 	keyFn func(T) K,
@@ -417,25 +417,25 @@ func ToMap[T any, K comparable, V any](
 //
 // Example:
 //
-//   s := seq.FromSlice([]string{"apple", "apricot", "banana"})
-//   m := seq.ToMapHint(s,
-//   	func(s string) string { return string(s[0]) },
-//   	func(s string) int { return len(s) },
-//   	2,
-//   )
+//	s := seq.FromSlice([]string{"apple", "apricot", "banana"})
+//	m := seq.ToMapHint(s,
+//		func(s string) string { return string(s[0]) },
+//		func(s string) int { return len(s) },
+//		2,
+//	)
 func ToMapHint[T any, K comparable, V any](
 	seq Seq[T],
 	keyFn func(T) K,
 	valFn func(T) V,
 	nKeysHint int,
 ) map[K]V {
-    res := make(map[K]V, nKeysHint)
-    seq.ForEach(func(x T) {
-        k := keyFn(x)
-        v := valFn(x)
+	res := make(map[K]V, nKeysHint)
+	seq.ForEach(func(x T) {
+		k := keyFn(x)
+		v := valFn(x)
 		res[k] = v
-    })
-    return res
+	})
+	return res
 }
 
 // ToMapMerge collects elements of a sequence into a map[K]V with conflict
@@ -446,33 +446,33 @@ func ToMapHint[T any, K comparable, V any](
 //
 // Example: prefer the first value with the same key on conflict
 //
-//   s := seq.FromSlice([]string{"apple", "apricot", "banana"})
-//   m := seq.ToMapMerge(s,
-//   	func(s string) string { return string(s[0]) }, // key: first letter
-//   	func(s string) int { return len(s) },          // value: length
-//   	func(a, b int) int { return a },               // mergeFn: prefer first
-//   	2,
-//   )
+//	s := seq.FromSlice([]string{"apple", "apricot", "banana"})
+//	m := seq.ToMapMerge(s,
+//		func(s string) string { return string(s[0]) }, // key: first letter
+//		func(s string) int { return len(s) },          // value: length
+//		func(a, b int) int { return a },               // mergeFn: prefer first
+//		2,
+//	)
 //
-//   // m["a"] = 10 (5+5), m["b"] = 6
+//	// m["a"] = 10 (5+5), m["b"] = 6
 func ToMapMerge[T any, K comparable, V any](
-    seq Seq[T],
-    keyFn func(T) K,
-    valFn func(T) V,
-    mergeFn func(V, V) V,
+	seq Seq[T],
+	keyFn func(T) K,
+	valFn func(T) V,
+	mergeFn func(V, V) V,
 	nKeysHint int,
 ) map[K]V {
-    res := make(map[K]V, nKeysHint)
-    seq.ForEach(func(x T) {
-        k := keyFn(x)
-        v := valFn(x)
-        if existing, ok := res[k]; ok {
-            res[k] = mergeFn(existing, v)
-        } else {
-            res[k] = v
-        }
-    })
-    return res
+	res := make(map[K]V, nKeysHint)
+	seq.ForEach(func(x T) {
+		k := keyFn(x)
+		v := valFn(x)
+		if existing, ok := res[k]; ok {
+			res[k] = mergeFn(existing, v)
+		} else {
+			res[k] = v
+		}
+	})
+	return res
 }
 
 // GroupBy collects elements of a sequence into slices keyed by the result
@@ -482,16 +482,16 @@ func ToMapMerge[T any, K comparable, V any](
 //
 // Example:
 //
-//   s := seq.FromSlice([]string{"apple", "apricot", "banana"})
-//   groups := seq.GroupBy(s, func(s string) string { return string(s[0]) })
+//	s := seq.FromSlice([]string{"apple", "apricot", "banana"})
+//	groups := seq.GroupBy(s, func(s string) string { return string(s[0]) })
 //
-//   // groups["a"] = []string{"apple", "apricot"}
-//   // groups["b"] = []string{"banana"}
+//	// groups["a"] = []string{"apple", "apricot"}
+//	// groups["b"] = []string{"banana"}
 func GroupBy[T any, K comparable](
 	seq Seq[T],
 	keyFn func(T) K,
 ) map[K][]T {
-    return GroupByHint(seq, keyFn, 8, 8)
+	return GroupByHint(seq, keyFn, 8, 8)
 }
 
 // GroupByHint collects elements of a sequence into slices keyed by the
@@ -505,15 +505,15 @@ func GroupBy[T any, K comparable](
 //
 // Example:
 //
-//   s := seq.FromSlice([]string{"apple", "apricot", "banana"})
-//   groups := seq.GroupByHint(s,
-//   	func(s string) string { return string(s[0]) },
-//   	2, // expect ~2 distinct keys
-//   	2, // expect ~2 values per key
-//   )
+//	s := seq.FromSlice([]string{"apple", "apricot", "banana"})
+//	groups := seq.GroupByHint(s,
+//		func(s string) string { return string(s[0]) },
+//		2, // expect ~2 distinct keys
+//		2, // expect ~2 values per key
+//	)
 //
-//   a := groups["a"]  // []string{"apple", "apricot"}
-//   b := groups["b"]  // []string{"banana"}
+//	a := groups["a"]  // []string{"apple", "apricot"}
+//	b := groups["b"]  // []string{"banana"}
 //
 // If nKeysHint or nValsHint are set too low, the function still works
 // correctly; they only affect allocation efficiency.
@@ -523,15 +523,15 @@ func GroupByHint[T any, K comparable](
 	nKeysHint int,
 	nValsHint int,
 ) map[K][]T {
-    res := make(map[K][]T, nKeysHint)
-    seq.ForEach(func(x T) {
-        k := keyFn(x)
+	res := make(map[K][]T, nKeysHint)
+	seq.ForEach(func(x T) {
+		k := keyFn(x)
 		if _, ok := res[k]; !ok {
 			res[k] = make([]T, 0, nValsHint)
 		}
-        res[k] = append(res[k], x)
-    })
-    return res
+		res[k] = append(res[k], x)
+	})
+	return res
 }
 
 // Reduce performs a left reduction over the sequence.
@@ -543,11 +543,11 @@ func GroupByHint[T any, K comparable](
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3})
-//   product := seq.Reduce(s, 1, func(acc, x int) int {
-//   	return acc * x
-//   })
-//   // product = 6
+//	s := seq.FromSlice([]int{1, 2, 3})
+//	product := seq.Reduce(s, 1, func(acc, x int) int {
+//		return acc * x
+//	})
+//	// product = 6
 func Reduce[T any, R any](
 	seq Seq[T],
 	acc R,
@@ -565,12 +565,12 @@ func Reduce[T any, R any](
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3})
-//   total := 0
-//   ReducePtr(s, &total, func(acc *int, x int) {
-//   	*acc += x
-//   })
-//   // total = 6
+//	s := seq.FromSlice([]int{1, 2, 3})
+//	total := 0
+//	ReducePtr(s, &total, func(acc *int, x int) {
+//		*acc += x
+//	})
+//	// total = 6
 func ReducePtr[T any, R any](
 	seq Seq[T],
 	acc *R,
@@ -590,11 +590,11 @@ func ReducePtr[T any, R any](
 //
 // Example:
 //
-//   s := seq.FromSlice([]int{1, 2, 3})
-//   sum := seq.Fold(s, 0, func(acc, x int) int {
-//   	return acc + x
-//   })
-//   // sum = 6
+//	s := seq.FromSlice([]int{1, 2, 3})
+//	sum := seq.Fold(s, 0, func(acc, x int) int {
+//		return acc + x
+//	})
+//	// sum = 6
 func Fold[T any, R any](
 	seq Seq[T],
 	acc R,
@@ -616,18 +616,19 @@ func Fold[T any, R any](
 //
 // Example: addition is associative, so results will be the same as Fold
 //
-//   s := seq.FromSlice([]int{1, 2, 3})
-//   sum := seq.Foldr(s, 0, func(x int, rest func() int) int {
-//   	return x + rest()
-//   })
-//   sum  // 6
+//	s := seq.FromSlice([]int{1, 2, 3})
+//	sum := seq.Foldr(s, 0, func(x int, rest func() int) int {
+//		return x + rest()
+//	})
+//	sum  // 6
 //
 // Example: subtraction is not associative, so results will be different from Fold
-//   s = seq.FromSlice([]int{1, 2, 3})
-//   res = seq.Foldr(s, 0, func(x int, rest func() int) int {
-//   	return x - rest()
-//   })
-//   res  // 2, because it is evaluated as 1 - (2 - (3 - 0)) = 2
+//
+//	s = seq.FromSlice([]int{1, 2, 3})
+//	res = seq.Foldr(s, 0, func(x int, rest func() int) int {
+//		return x - rest()
+//	})
+//	res  // 2, because it is evaluated as 1 - (2 - (3 - 0)) = 2
 func Foldr[T any, R any](
 	seq Seq[T],
 	acc R,

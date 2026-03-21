@@ -3,6 +3,7 @@ package stack
 import (
 	"fmt"
 	"testing"
+	"unsafe"
 
 	. "github.com/zelr0x/chainyq/internal/testutil"
 )
@@ -147,4 +148,21 @@ func TestStringStackOps(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStackExample1(t *testing.T) {
+	s := New[int]()
+	s.Push(1)
+	s.Push(2)
+	s.Push(3)
+	if v, ok := s.PeekPtr(); ok {
+		*v = 50
+	}
+	AssertSliceEq(t, []int{50, 2, 1}, s.ToSlice())
+	AssertSliceEq(t, []int{1, 2, 50}, s.UnwrapCopy())
+	backing := s.UnwrapUnsafe()
+	AssertSliceEq(t, []int{1, 2, 50}, backing)
+	want := (*[2]uintptr)(unsafe.Pointer(&s.b))[0]
+    got := (*[2]uintptr)(unsafe.Pointer(&backing))[0]
+	AssertEq(t, want, got)
 }
