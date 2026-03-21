@@ -990,7 +990,7 @@ func TestDocExample1(t *testing.T) {
 	v, ok = it.Prev()
 	AssertEqOk(t, 1, v, ok, "InsertBefore should not move the iterator's cursor")
 	v, ok = it.Prev()
-	AssertEqOk(t, 55, v, ok, "Prev Prev after InsertBefore should give inserted item")
+	AssertEqOk(t, 55, v, ok, "Prev+Prev after InsertBefore should give inserted item")
 	v, ok = it.Remove()
 	AssertEqOk(t, 55, v, ok, "Remove at value 55")
 	v, ok = it.Next()

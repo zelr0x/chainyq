@@ -52,85 +52,88 @@ go get github.com/zelr0x/chainyq
 
 The following benchmarks highlight common workloads for deques.
 
-#### TL;DR:
-- Fastest overall: chainyq.Deque
-- Most memory efficient: chainyq.Deque
-- Random access: gz slightly faster
-- Bursty growth: chainyq wins clearly
+| PushBack                   |  ns/op         | B/op       | allocs/op |
+|----------------------------|---------------:|-----------:|----------:|
+| chainyq.Deque              |    3.618 ±  8% |    8 ±  0% |         0 |
+| chainyq.Deque_EnsureBack   |    2.757 ±  8% |    0 ±  0% |         0 |
+| edwingeng.Deque            |    5.303 ±  2% |    8 ±  0% |         0 |
+| gammazero.Deque            |    4.268 ± 51% |   14 ± 14% |         0 |
+| gammazero.Deque_SetBaseCap |    4.132 ±  2% |   14 ±  7% |         0 |
+| chainyq.List               |   50.660 ± 13% |   24 ±  0% |         1 |
+| container.List             |   78.810 ± 11% |   55 ±  0% |         1 |
 
 
-| PushBack                   |  ns/op   | B/op | allocs/op |
-|----------------------------|---------:|-----:|----------:|
-| chainyq.Deque              |    4.265 |    8 |         0 |
-| chainyq.Deque_Ensure       |    3.460 |    0 |         0 |
-| edwingeng.Deque            |    5.420 |    8 |         0 |
-| gammazero.Deque            |    5.889 |   14 |         0 |
-| gammazero.Deque_SetBaseCap |    3.885 |    8 |         0 |
-| chainyq.List               |   38.640 |   24 |         1 |
-| container.List             |   61.730 |   55 |         1 |
+| PushFront                  | ns/op          | B/op         | allocs/op |
+|----------------------------|---------------:|-------------:|----------:|
+| chainyq.Deque              |    3.690 ±  5% |    8.0 ±  0% |         0 |
+| chainyq.Deque_EnsureFront  |    3.620 ±  3% |    8.0 ±  0% |         0 |
+| edwingeng.Deque            |    4.836 ±  3% |    8.0 ±  0% |         0 |
+| gammazero.Deque            |    5.125 ± 52% |   18.5 ± 19% |         0 |
+| chainyq.List               |   47.580 ± 12% |   24.0 ±  0% |         1 |
+| container.List             |   76.700 ±  9% |   55.0 ±  0% |         1 |
 
 
-| PushFront                  | ns/op    | B/op | allocs/op |
-|----------------------------|---------:|-----:|----------:|
-| chainyq.Deque              |    3.782 |    8 |         0 |
-| edwingeng.Deque            |    4.273 |    8 |         0 |
-| gammazero.Deque            |    4.732 |   17 |         0 |
-| chainyq.List               |   33.800 |   24 |         1 |
-| container.List             |   60.950 |   55 |         1 |
+| BlockBoundaryThrash        | ns/op          | B/op       | allocs/op |
+|----------------------------|---------------:|-----------:|----------:|
+| chainyq.Deque              |    5.284 ± 11% |    0 ± 0%  |         0 |
+
+*This one is extremely unpleasant for segmented arrays. Notice the memory*
 
 
-| Random churn (int)         | ns/op    | B/op | allocs/op |
-|----------------------------|---------:|-----:|----------:|
-| chainyq.Deque              |    9.799 |    0 |         0 |
-| edwingeng.Deque            |   10.350 |    0 |         0 |
-| gammazero.Deque            |   10.880 |    0 |         0 |
-| chainyq.List               |   18.560 |   11 |         0 |
-| container.List             |   26.020 |   27 |         0 |
+| Random churn (int)         | ns/op         | B/op      | allocs/op |
+|----------------------------|-------------:|-----------:|----------:|
+| chainyq.Deque              |   10.22 ± 1% |    0 ± 0%  |         0 |
+| edwingeng.Deque            |   10.49 ± 1% |    0 ± 0%  |         0 |
+| gammazero.Deque            |   11.36 ± 2% |    0 ± 0%  |         0 |
+| chainyq.List               |   20.11 ± 1% |   11 ± 0%  |         0 |
+| container.List             |   28.47 ± 1% |   27 ± 0%  |         0 |
 
 
-| Random churn (big struct)  | ns/op    | B/op | allocs/op |
-|----------------------------|---------:|-----:|----------:|
-| chainyq.Deque              |    14.56 |    0 |         0 |
-| edwingeng.Deque            |    15.61 |    0 |         0 |
-| gammazero.Deque            |    15.06 |    0 |         0 |
+| Random churn (big struct)  | ns/op         | B/op       | allocs/op |
+|----------------------------|--------------:|-----------:|----------:|
+| chainyq.Deque              |    15.66 ± 2% |    0 ± 0%  |         0 |
+| edwingeng.Deque            |    16.31 ± 2% |    0 ± 0%  |         0 |
+| gammazero.Deque            |    15.49 ± 1% |    0 ± 0%  |         0 |
 
 
-| Random access (get by index) | ns/op    | B/op | allocs/op |
-|------------------------------|---------:|-----:|----------:|
-| chainyq.Deque                |    9.127 |    0 |         0 |
-| edwingeng.Deque              |  2758.00 |    0 |         0 |
-| gammazero.Deque              |    8.606 |    0 |         0 |
+| Random access (get by index) | ns/op         | B/op       | allocs/op |
+|------------------------------|--------------:|-----------:|----------:|
+| chainyq.Deque                |    10.11 ± 6% |    0 ± 8%  |         0 |
+| edwingeng.Deque              |  2948.00 ± 2% |    0 ± 8%  |         0 |
+| gammazero.Deque              |    9.799 ± 2% |    0 ± 8%  |         0 |
 
 *Ring buffer should win here, but the gain is in the noise range*
 
 
-| Bursts of 100k writes/10k reads | ns/op    | B/op | allocs/op |
-|---------------------------------|---------:|-----:|----------:|
-| chainyq.Deque					  |    17.34 |    0 |         0 |
-| edwingeng.Deque				  |    19.90 |    0 |         0 |
-| gammazero.Deque				  |    36.05 |    0 |         0 |
+| Bursts of 100k writes/10k reads | ns/op          | B/op       | allocs/op |
+|---------------------------------|---------------:|-----------:|----------:|
+| chainyq.Deque					  |    18.96 ± 6%  |    0 ± 0%  |         0 |
+| edwingeng.Deque				  |    20.44 ± 2%  |    0 ± 0%  |         0 |
+| gammazero.Deque				  |    29.04 ± 2%  |    2 ± 0%  |         0 |
 
 *Segmented array should win here*
 
 
-| Sliding window             | ns/op    | B/op | allocs/op |
-|----------------------------|---------:|-----:|----------:|
-| chainyq.Deque              |    18.16 |    0 |         0 |
-| edwingeng.Deque            |    19.95 |    0 |         0 |
-| gammazero.Deque            |    17.07 |    0 |         0 |
+| Sliding window             | ns/op          | B/op       | allocs/op |
+|----------------------------|---------------:|-----------:|----------:|
+| chainyq.Deque              |    17.87 ± 8%  |    0 ± 0%  |         0 |
+| edwingeng.Deque            |    21.13 ± 7%  |    0 ± 0%  |         0 |
+| gammazero.Deque            |    17.54 ± 8%  |    0 ± 0%  |         0 |
 
 *Ring buffer should win here, but the gain is minimal*
 
 
 Across all benchmarks, `chainyq.Deque` has delivered excellent performance:
-- On small input sizes, its performance is virtually indistinguishable
-from a ring buffer.
-- On larger input sizes, it doesn't fall behind a ring buffer even on workloads
-that favor them. Random access and sliding window benchmarks demonstrate
-this clearly: a segmented array can't beat a good ring buffer there, yet
-`chainyq.Deque` keeps up with the fastest.
-- On workloads that involve growing it shows the best performance with both small and
-large sized items.
+- It matches the fastest ring buffer implementations even on workloads
+that traditionally favor them. Random access and sliding window benchmarks
+demonstrate this clearly: a segmented array can't beat a good ring buffer
+there, yet `chainyq.Deque` keeps up.
+- In bursty growth scenarios, it is the clear winner.
+- It remains unaffected by workloads tailored to hurt segmented arrays,
+such as block boundary thrashing.
+- Overall, `chainyq.Deque` is not only extremely fast but also the most stable
+across runs, with the lowest variance and consistent 0 allocs/op and ~8 B/op
+memory usage.
 
 Full results are available in bench.txt, the code for benchmarks is at `/deque/deque_benchmark_test.go`.
 

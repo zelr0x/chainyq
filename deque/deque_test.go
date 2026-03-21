@@ -17,6 +17,7 @@ package deque
 
 import (
 	"fmt"
+	"math/bits"
 	"math/rand"
 	"testing"
 
@@ -29,6 +30,7 @@ var defCfg DequeCfg = DequeCfg{
 	FrontCap:  2,
 	BackCap:   2,
 }
+
 var defCfgPooled = func() DequeCfg {
 	copy := defCfg
 	copy.Pooled = true
@@ -62,6 +64,132 @@ const defCfgInitCap int = 4 * 4
 // 	}
 // 	AssertTrue(t, d.Len() > -1, "avoid optimizing away")
 // }
+
+func TestSuggestBlockSize(t *testing.T) {
+	type tiny struct{}
+	type small struct{ _ int32 }
+	type medium struct{ _, _ int64 }
+	type big struct{ _ [33]byte } // covers misaligned branch: if rem != 0 ...
+	tests := []struct {
+		name string
+		fn   func() int
+		want func(int) bool
+	}{
+		{
+			"ZST",
+			func() int { return SuggestBlockSize[tiny]() },
+			func(v int) bool { return v == minBlockSize },
+		},
+		{
+			"small type int32",
+			func() int { return SuggestBlockSize[small]() },
+			func(v int) bool {
+				return v >= minBlockSize && v&(v-1) == 0
+			},
+		},
+		{
+			"medium type int64 pair",
+			func() int { return SuggestBlockSize[medium]() },
+			func(v int) bool {
+				return v >= minBlockSize && v&(v-1) == 0
+			},
+		},
+		{
+			"big struct bytes",
+			func() int { return SuggestBlockSize[big]() },
+			func(v int) bool {
+				return v >= minBlockSize && v&(v-1) == 0
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.fn()
+			want := tt.want(got)
+			AssertTrue(t, want, fmt.Sprintf("SuggestBlockSize() = %d", got))
+		})
+	}
+}
+
+func TestNewValue(t *testing.T) {
+	suggestedIntBlockSize := SuggestBlockSize[int]()
+	tests := []struct {
+		name        string
+		cfg         DequeCfg
+		wantBlkSize int
+		wantShift   uint
+		wantFront   int
+		wantTotal   int
+	}{
+		{
+			name:        "default config",
+			cfg:         DequeCfg{},
+			wantBlkSize: suggestedIntBlockSize,
+			wantShift:   uint(bits.TrailingZeros(uint(suggestedIntBlockSize))), // #nosec G115
+			wantFront:   defSideCapBlocks,
+			wantTotal:   2 * defSideCapBlocks,
+		},
+		{
+			name:        "block size below min",
+			cfg:         DequeCfg{BlockSize: minBlockSize - 1},
+			wantBlkSize: minBlockSize,
+			wantShift:   uint(bits.TrailingZeros(uint(minBlockSize))), // #nosec G115
+			wantFront:   defSideCapBlocks,
+			wantTotal:   2 * defSideCapBlocks,
+		},
+		{
+			name:        "block size above max",
+			cfg:         DequeCfg{BlockSize: maxBlockSize + 1},
+			wantBlkSize: maxBlockSize,
+			wantShift:   uint(bits.TrailingZeros(uint(maxBlockSize))), // #nosec G115
+			wantFront:   defSideCapBlocks,
+			wantTotal:   2 * defSideCapBlocks,
+		},
+		{
+			name:        "block size rounded to next pow2",
+			cfg:         DequeCfg{BlockSize: (maxBlockSize << 1) + 1},
+			wantBlkSize: maxBlockSize,
+			wantShift:   uint(bits.TrailingZeros(uint(maxBlockSize))), // #nosec G115
+			wantFront:   defSideCapBlocks,
+			wantTotal:   2 * defSideCapBlocks,
+		},
+		{
+			name:        "front capacity specified",
+			cfg:         DequeCfg{FrontCap: 10000},
+			wantBlkSize: suggestedIntBlockSize,
+			wantShift:   uint(bits.TrailingZeros(uint(suggestedIntBlockSize))), // #nosec G115
+			wantFront:   blocksForCapCeil(suggestedIntBlockSize, 10000),
+			wantTotal:   defSideCapBlocks + blocksForCapCeil(suggestedIntBlockSize, 10000),
+		},
+		{
+			name:        "back capacity specified",
+			cfg:         DequeCfg{BackCap: 10000},
+			wantBlkSize: suggestedIntBlockSize,
+			wantShift:   uint(bits.TrailingZeros(uint(suggestedIntBlockSize))), // #nosec G115
+			wantFront:   defSideCapBlocks,
+			wantTotal:   defSideCapBlocks + blocksForCapCeil(suggestedIntBlockSize, 10000),
+		},
+		{
+			name:        "front and back capacity specified",
+			cfg:         DequeCfg{FrontCap: 2000, BackCap: 8000},
+			wantBlkSize: suggestedIntBlockSize,
+			wantShift:   uint(bits.TrailingZeros(uint(suggestedIntBlockSize))), // #nosec G115
+			wantFront:   blocksForCapCeil(suggestedIntBlockSize, 2000),
+			wantTotal: blocksForCapCeil(suggestedIntBlockSize, 2000) +
+				blocksForCapCeil(suggestedIntBlockSize, 8000),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := NewValue[int](tt.cfg)
+			AssertEq(t, tt.wantBlkSize, d.blockSize)
+			AssertEq(t, tt.wantShift, d.blockShift)
+			AssertEq(t, tt.wantFront, d.initCfg.frontBlock)
+			AssertEq(t, tt.wantFront, d.initCfg.backBlock)
+			AssertEq(t, tt.wantTotal, d.initCfg.totalBlocks)
+		})
+	}
+}
 
 func TestString(t *testing.T) {
 	var d *Deque[int]
@@ -169,7 +297,7 @@ func TestPushBack1M(t *testing.T) {
 	d := New[int]()
 	n := 1_000_000
 	want := make([]int, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		d.PushBack(i)
 		want = append(want, i)
 	}
@@ -181,7 +309,7 @@ func TestPooledPushBack1M(t *testing.T) {
 	d := WithCfg[int](defCfgPooled)
 	n := 1_000_000
 	want := make([]int, 0, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		d.PushBack(i)
 		want = append(want, i)
 	}
@@ -198,7 +326,7 @@ func TestPushBackPopBackPushFront(t *testing.T) {
 	for i := 0; i < n/5; i++ {
 		d.PopBack()
 	}
-	for i := 0; i < n; i++ {
+	for i := range n {
 		d.PushFront(i)
 	}
 	got := d.ToSlice()
@@ -414,7 +542,7 @@ func TestRandomOps(t *testing.T) {
 	d := WithCfg[int](defCfg)
 	ref := []int{}
 	rnd := rand.New(rand.NewSource(1))
-	for i := 0; i < 100000; i++ {
+	for range 100000 {
 		op := rnd.Intn(4)
 		switch op {
 		case 0: // push back
@@ -449,11 +577,11 @@ func TestRandomOps(t *testing.T) {
 
 func TestBlockBoundaryWrap(t *testing.T) {
 	d := WithCfg[int](defCfg)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		d.PushBack(i)
 	}
 	AssertDequeInvariant(t, d)
-	for i := 0; i < 90; i++ {
+	for range 90 {
 		d.PopFront()
 	}
 	AssertDequeInvariant(t, d)
@@ -468,10 +596,10 @@ func TestDequeBlockBoundary(t *testing.T) {
 	cfg := defCfg
 	cfg.BlockSize = 8
 	d := WithCfg[int](cfg)
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		d.PushBack(i)
 	}
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		v, _ := d.PopFront()
 		AssertEq(t, i, v)
 	}
@@ -537,13 +665,13 @@ func TestClear(t *testing.T) {
 
 func TestClearThenReuse(t *testing.T) {
 	d := WithCfg[int](defCfg)
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		d.PushBack(i)
 	}
 	AssertDequeInvariant(t, d)
 	d.Clear()
 	AssertDequeInvariant(t, d)
-	for i := 0; i < 128; i++ {
+	for i := range 128 {
 		d.PushBack(i)
 	}
 	AssertDequeInvariant(t, d)
@@ -633,7 +761,7 @@ func TestClearReleasePushBackHangOrPanic(t *testing.T) {
 func TestNastyInterleave1(t *testing.T) {
 	d := New[int]()
 	ref := []int{}
-	for i := 0; i < 10000; i++ {
+	for i := range 10000 {
 		switch i % 4 {
 		case 0:
 			d.PushFront(i)
@@ -664,7 +792,7 @@ func TestNastyInterleave2(t *testing.T) {
 	const n = 1024
 	d := WithCfg[int](defCfgPooled)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if i%2 == 0 {
 			d.PushBack(i)
 		} else {
@@ -673,7 +801,7 @@ func TestNastyInterleave2(t *testing.T) {
 	}
 	AssertDequeInvariant(t, d)
 
-	for i := 0; i < n/4; i++ {
+	for range n / 4 {
 		d.PopFront()
 		d.PopBack()
 	}

@@ -501,7 +501,7 @@ func (l *List[T]) nodeAtUnchecked(idx int) *node[T] {
 		}
 	} else {
 		n = l.head.next
-		for i := 0; i < idx; i++ {
+		for range idx {
 			n = n.next
 		}
 	}
@@ -1178,7 +1178,7 @@ func (it *BidiIter[T]) TakeSlice(n int) []T {
 		return []T{}
 	}
 	res := make([]T, 0, min(it.l.len, n))
-	for i := 0; i < n; i++ {
+	for range n {
 		v, ok := it.Next()
 		if !ok {
 			break
@@ -1198,7 +1198,7 @@ func (it *BidiIter[T]) TakePtrSlice(n int) []*T {
 		return []*T{}
 	}
 	res := make([]*T, 0, min(it.l.len, n))
-	for i := 0; i < n; i++ {
+	for range n {
 		v, ok := it.NextPtr()
 		if !ok {
 			break

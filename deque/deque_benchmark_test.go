@@ -19,16 +19,17 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/zelr0x/chainyq/internal/benchutil"
-
 	ed "github.com/edwingeng/deque/v2" // sync.pooled, segmented or similar
 	gz "github.com/gammazero/deque"    // ring-buffer-based
+
+	. "github.com/zelr0x/chainyq/internal/benchutil"
 	"github.com/zelr0x/chainyq/list"
 )
 
 const seed int64 = 31337
 
 var Sink int
+
 var BigStructSink BigStruct
 
 type BigStruct struct {
@@ -725,7 +726,7 @@ func BenchmarkBurstyQueue(b *testing.B) {
 func BenchmarkSlidingWindowMax(b *testing.B) {
 	const N = 1_000_000
 	const W = 1024
-	const R = 10
+	const R = 2
 	data := RandomIntSliceN(b, seed, N, N)
 
 	b.Run("chainyq.Deque", func(b *testing.B) {

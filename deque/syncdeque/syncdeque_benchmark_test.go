@@ -75,11 +75,11 @@ func BenchmarkBurstyWithEnsure(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
 		for pb.Next() {
-			for j := 0; j < burstSize; j++ {
+			for range burstSize {
 				d.PushBack(i)
 				i++
 			}
-			for j := 0; j < burstSize; j++ {
+			for range burstSize {
 				d.PopFront()
 			}
 		}

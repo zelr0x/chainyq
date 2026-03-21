@@ -1,0 +1,75 @@
+version: "2"
+run:
+  issues-exit-code: 1
+output:
+  formats:
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
+linters:
+  default: none
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - errcheck
+    - errname
+    - exhaustive
+    - gosec
+    - govet
+    - importas
+    - ineffassign
+    - misspell
+    - modernize
+    - prealloc
+    - staticcheck
+    - testableexamples
+    - tparallel
+    - unconvert
+    - unused
+    - wastedassign
+    - whitespace
+  settings:
+    exhaustive:
+      ignore-enum-types: reflect.Kind
+  exclusions:
+    rules:
+      - linters:
+        - dupl
+        path: .*_test\.go # allow code duplication in tests for now
+      - linters:
+        - gosec
+        path: .*_test\.go
+        text: G103 # allow all unsafe in tests
+      - linters:
+        - gosec
+        path: .*_test\.go
+        text: G404 # deliberate weak rand in tests
+      - linters:
+        - gosec
+        path: internal/testutil/testutil.go
+        text: G404 # deliberate weak rand in testutil
+      - linters:
+        - gosec
+        path: internal/benchutil/benchutil.go
+        text: G404 # deliberate weak rand in benchutil
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard # Standard section: captures all standard packages.
+        - default # Default section: contains all imports that could not be matched to another section type.
+        - prefix(github.com/zelr0x/chainyq) # Custom section: groups all imports with the specified Prefix.
+      custom-order: true

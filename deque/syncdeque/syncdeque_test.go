@@ -31,7 +31,7 @@ func TestConcurrentAccess(t *testing.T) {
 
 	// PopFront + PushBack
 	g1 := func() {
-		for i := 0; i < N; i++ {
+		for i := range N {
 			if v, ok := d.PopFront(); ok {
 				d.PushBack(v)
 			} else {
@@ -42,7 +42,7 @@ func TestConcurrentAccess(t *testing.T) {
 
 	// PopBack + PushFront
 	g2 := func() {
-		for i := 0; i < N; i++ {
+		for i := range N {
 			if v, ok := d.PopBack(); ok {
 				d.PushFront(v)
 			} else {
@@ -53,7 +53,7 @@ func TestConcurrentAccess(t *testing.T) {
 
 	// Reads
 	g3 := func() {
-		for i := 0; i < N; i++ {
+		for range N {
 			_ = d.Len()
 			_ = d.IsEmpty()
 			d.Front()
@@ -81,7 +81,7 @@ func TestSyncDequeConcurrentRandom(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		for i := 0; i < N; i++ {
+		for i := range N {
 			switch i % 4 {
 			case 0:
 				d.PushBack(i)
@@ -97,7 +97,7 @@ func TestSyncDequeConcurrentRandom(t *testing.T) {
 	}()
 
 	go func() {
-		for i := 0; i < N; i++ {
+		for range N {
 			_ = d.Len()
 			_ = d.IsEmpty()
 			_, _ = d.Front()

@@ -17,6 +17,7 @@ package deque
 
 import (
 	"fmt"
+	"math"
 	"math/bits"
 	"strings"
 	"unsafe"
@@ -27,9 +28,11 @@ import (
 )
 
 const (
-	defCapBlocksEachSide int = 8
-	defPoolInitCap       int = 32
-	takeWhileInitCap         = 32
+	defSideCapBlocks int = 8
+	minBlockSize     int = 4
+	maxBlockSize     int = 4096
+	maxSideCapItems  int = math.MaxInt - maxBlockSize + 1 // Overflow protection only
+	takeWhileInitCap int = 32
 )
 
 type DequeCfg struct {
@@ -38,17 +41,34 @@ type DequeCfg struct {
 	// it will be rounded up to the next power of 2.
 	// Use [SuggestBlockSize] to get advised block size.
 	BlockSize int
+
 	// FrontCap is the number of items you can push to the front
 	// without reallocating the deque. Note that this is not the same
 	// as preallocating the blocks themselves. For that use [EnsureFront]
 	// and [EnsureBack] after creation.
 	FrontCap int
+
 	// BackCap is the number of items you can push to the back
 	// without reallocating the deque. Note that this is not the same
 	// as preallocating the blocks themselves. For that use [EnsureFront]
 	// and [EnsureBack] after creation.
 	BackCap int
-	// Pooled specifies if object pool should be used. See [PreallocPool]
+
+	// Pooled specifies if object pool should be used. See [PreallocPool].
+	// Note that using a pool does not automatically improve performance.
+	// It just means blocks (underlying slices) are kept in the pool
+	// instead of being freed when not in use, and future allocations
+	// reuse them rather than allocating new slices.
+	//
+	// Both this deque and the Go runtime handle occasional slice allocations
+	// very well, and it is difficult to beat the runtime allocator even
+	// with an optimized pool. Don't treat pooling as a free speed
+	// boost - you may see no gain or even a slight slowdown.
+	// The main benefit is more predictable memory usage, but the gains
+	// dependend heavily on the GC and current load.
+	//
+	// If you know the number of items you will push and want to maximize speed,
+	// use [EnsureFront] or [EnsureBack] instead.
 	Pooled bool
 }
 
@@ -121,26 +141,13 @@ type blockIndex struct {
 
 // New creates a deque with default block size and default capacity.
 func New[T any]() *Deque[T] {
-	blockSize := SuggestBlockSize[T]()
-	sideCap := blockSize * defCapBlocksEachSide
-	cfg := DequeCfg{
-		BlockSize: blockSize,
-		FrontCap:  sideCap,
-		BackCap:   sideCap,
-	}
-	return WithCfg[T](cfg)
+	return WithCfg[T](DequeCfg{})
 }
 
 func NewPooled[T any]() *Deque[T] {
-	blockSize := SuggestBlockSize[T]()
-	sideCap := blockSize * defCapBlocksEachSide
-	cfg := DequeCfg{
-		BlockSize: blockSize,
-		FrontCap:  sideCap,
-		BackCap:   sideCap,
-		Pooled:    true,
-	}
-	return WithCfg[T](cfg)
+	return WithCfg[T](DequeCfg{
+		Pooled: true,
+	})
 }
 
 // WithCfg creates a deque with the given configuration.
@@ -153,35 +160,42 @@ func WithCfg[T any](cfg DequeCfg) *Deque[T] {
 // This is meant for advanced use cases, most users should use [New]
 // and [WithCfg] to create a *Deque[T].
 func NewValue[T any](cfg DequeCfg) Deque[T] {
-	blockSize := cfg.BlockSize
-	if blockSize < 4 {
-		blockSize = 4
+	blockSize := numutil.ClampInt(cfg.BlockSize, 0, maxBlockSize)
+	if blockSize == 0 {
+		blockSize = SuggestBlockSize[T]()
 	} else {
-		blockSize = int(numutil.RoundNextPow2(uint(blockSize)))
+		blockSize = int(numutil.RoundNextPow2(uint(blockSize))) // #nosec G115
 	}
-	cfg.BlockSize = blockSize // for newInitCfg
-	if cfg.FrontCap < defCapBlocksEachSide {
-		cfg.FrontCap = defCapBlocksEachSide
+
+	frontBlocks := defSideCapBlocks
+	backBlocks := defSideCapBlocks
+	{
+		frontCapItems := numutil.ClampInt(cfg.FrontCap, 0, maxSideCapItems)
+		backCapItems := numutil.ClampInt(cfg.BackCap, 0, maxSideCapItems)
+		if frontCapItems != 0 {
+			frontBlocks = numutil.MaxInt(1, blocksForCapCeil(blockSize, frontCapItems))
+		}
+		if backCapItems != 0 {
+			backBlocks = numutil.MaxInt(1, blocksForCapCeil(blockSize, backCapItems))
+		}
 	}
-	if cfg.BackCap < defCapBlocksEachSide {
-		cfg.BackCap = defCapBlocksEachSide
-	}
-	initCfg := newInitCfg(cfg)
-	a := newDequeAlloc[T](dequeAllocCfg{
-		blockSize: blockSize,
-		pooled:    cfg.Pooled,
-	})
-	dequeState := dequeState[T]{}
-	blockCfg := blockCfg{
-		blockSize:  blockSize,
-		blockMask:  blockSize - 1,
-		blockShift: uint(bits.TrailingZeros(uint(blockSize))),
-	}
+
 	d := Deque[T]{
-		dequeState: dequeState,
-		blockCfg:   blockCfg,
-		a:          a,
-		initCfg:    initCfg,
+		dequeState: dequeState[T]{},
+		blockCfg: blockCfg{
+			blockSize:  blockSize,
+			blockMask:  blockSize - 1,
+			blockShift: uint(bits.TrailingZeros(uint(blockSize))), // #nosec G115
+		},
+		a: newDequeAlloc[T](dequeAllocCfg{
+			blockSize: blockSize,
+			pooled:    cfg.Pooled,
+		}),
+		initCfg: initCfg{
+			totalBlocks: numutil.MaxInt(2, frontBlocks+backBlocks),
+			frontBlock:  frontBlocks,
+			backBlock:   frontBlocks, // not a typo
+		},
 	}
 	d.init()
 	return d
@@ -198,32 +212,23 @@ func SuggestBlockSize[T any]() int {
 	)
 
 	var zero T
-	sz := int(unsafe.Sizeof(zero))
-
+	sz := int(unsafe.Sizeof(zero)) // #nosec G115
 	if sz == 0 {
-		return 4
+		return minBlockSize
 	}
 
-	blockBytes := targetBytes
-	if blockBytes < minBytes {
-		blockBytes = minBytes
-	}
-	if blockBytes > maxBytes {
-		blockBytes = maxBytes
-	}
+	blockBytes := numutil.ClampInt(targetBytes, minBytes, maxBytes)
 
 	blockSize := (blockBytes + sz - 1) / sz
-	blockSize = int(numutil.RoundNextPow2(uint(blockSize)))
-	if blockSize < 4 {
-		blockSize = 4
-	}
+	blockSize = int(numutil.RoundNextPow2(uint(blockSize))) // #nosec G115
+	blockSize = numutil.MaxInt(blockSize, minBlockSize)
 
 	bytesUsed := blockSize * sz
 	rem := bytesUsed % cacheLine
 	if rem != 0 {
 		padding := (cacheLine - rem + sz - 1) / sz
 		blockSize += padding
-		blockSize = int(numutil.RoundNextPow2(uint(blockSize)))
+		blockSize = int(numutil.RoundNextPow2(uint(blockSize))) // #nosec G115
 	}
 
 	return blockSize
@@ -524,7 +529,7 @@ func (d *Deque[T]) Get(idx int) (T, bool) {
 }
 
 // Get finds an item with the given index from the deque and returns
-// a pointer to it it and true if the index is valid, zero value
+// a pointer to it and true if the index is valid, zero value
 // and false otherwise.
 func (d *Deque[T]) GetPtr(idx int) (*T, bool) {
 	if idx < 0 || idx >= d.len {
@@ -770,20 +775,6 @@ func (d *Deque[T]) newIter(start blockIndex) BidiIter[T] {
 		blockCfg: d.blockCfg,
 		cur:      start,
 		frontAbs: posFromFront,
-	}
-}
-
-func newInitCfg(cfg DequeCfg) initCfg {
-	blockSize := cfg.BlockSize
-	frontBlocks := blocksForCapCeil(blockSize, cfg.FrontCap)
-	// At least one backBlock must be present at all times, so front can start
-	// at the start of that block, even if we're growing with pushfront only.
-	backBlocks := numutil.MaxInt(1, blocksForCapCeil(blockSize, cfg.BackCap))
-	totalBlocks := numutil.MaxInt(2, frontBlocks+backBlocks)
-	return initCfg{
-		totalBlocks: totalBlocks,
-		frontBlock:  frontBlocks,
-		backBlock:   frontBlocks,
 	}
 }
 
@@ -1438,7 +1429,7 @@ func (it *BidiIter[T]) TakeSlice(n int) []T {
 		return []T{}
 	}
 	res := make([]T, 0, numutil.MinInt(it.d.len, n))
-	for i := 0; i < n; i++ {
+	for range n {
 		v, ok := it.Next()
 		if !ok {
 			break
@@ -1458,7 +1449,7 @@ func (it *BidiIter[T]) TakePtrSlice(n int) []*T {
 		return []*T{}
 	}
 	res := make([]*T, 0, numutil.MinInt(it.d.len, n))
-	for i := 0; i < n; i++ {
+	for range n {
 		v, ok := it.NextPtr()
 		if !ok {
 			break
