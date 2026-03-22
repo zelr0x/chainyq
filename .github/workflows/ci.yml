@@ -6,9 +6,15 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 permissions:
   contents: read
@@ -32,12 +38,16 @@ jobs:
           - mac
           - windows
         go:
+          - '1.25'
           - '1.26'
 
         include:
-          # Set the minimum Go patch version for the given Go minor
+        # Set the minimum Go patch version for the given Go minor
+        # Usable via ${{ matrix.GO_SEMVER }}
+        - go: '1.25'
+          GO_SEMVER: '~1.25.0'
         - go: '1.26'
-          GO_SEMVER: '~1.26.0' # Usable via ${{ matrix.GO_SEMVER }}
+          GO_SEMVER: '~1.26.0'
 
         - os: linux
           OS_LABEL: ubuntu-latest
