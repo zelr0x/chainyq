@@ -1,5 +1,10 @@
 # chainyq
 
+[![](https://img.shields.io/github/actions/workflow/status/zelr0x/chainyq/ci.yml?branch=master&longCache=true&label=Tests&logo=github%20actions&logoColor=fff)](https://github.com/zelr0x/chainyq/actions?query=workflow%3ATests)
+[![codecov](https://codecov.io/github/zelr0x/chainyq/branch/master/graph/badge.svg)](https://codecov.io/github/zelr0x/chainyq)
+[![godoc](https://pkg.go.dev/badge/github.com/zelr0x/chainyq.svg)](https://pkg.go.dev/github.com/zelr0x/chainyq)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zelr0x/chainyq)](https://goreportcard.com/report/github.com/zelr0x/chainyq)
+
 <img src="docs/images/logo.png" alt="Project Logo" width="250"/>
 
 Chainyq provides fast, ergonomic queues, lists, and iterators for Go,
@@ -16,13 +21,13 @@ Currently available:
   - **Likely the fastest general-purpose deque you'll find**
 - `List[T any]` - a simple doubly-linked list
   - Fast insertion and deletion in the middle, for cases when you need to do it frequently
-  - 1.5-2x faster than container.List on end operations
+  - ~1.5x faster than container.List
   - 3 types of iterators
 - `Stack[T any]` - a slice-based stack
   - Fast `Push`, `Pop` and `Peek`
   - Top-down iterator
 - `Seq[T any]` - extremely lightweight and simple lazy sequence
-  - `Filter`, `Map`, `FlatMap`, `Reduce`, `ForEach`, `ToSlice`, `GroupBy`, `ToMap`, etc.
+  - `Filter`, `Map`, `FlatMap`, `Reduce`, `ForEach`, `ToSlice`, `ToMap`, `GroupBy`, etc.
   - Can be created from iterators, slices, and just functions
   - Supports lazy infinite sequences
 - `SyncDeque[T any]` - synchronized wrapper around `Deque[T]`
