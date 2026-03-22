@@ -3,7 +3,6 @@ package stack
 import (
 	"fmt"
 	"testing"
-	"unsafe"
 
 	. "github.com/zelr0x/chainyq/internal/testutil"
 )
@@ -162,7 +161,5 @@ func TestStackExample1(t *testing.T) {
 	AssertSliceEq(t, []int{1, 2, 50}, s.UnwrapCopy())
 	backing := s.UnwrapUnsafe()
 	AssertSliceEq(t, []int{1, 2, 50}, backing)
-	want := (*[2]uintptr)(unsafe.Pointer(&s.b))[0]
-	got := (*[2]uintptr)(unsafe.Pointer(&backing))[0]
-	AssertEq(t, want, got)
+	AssertSameSlice(t, s.b, backing)
 }

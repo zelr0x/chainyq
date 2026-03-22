@@ -19,9 +19,62 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+	"unsafe"
 )
 
 const seed int64 = 31337
+
+func AssertSameSlice[T any](
+	t *testing.T,
+	want []T,
+	got []T,
+	msg ...string,
+) {
+	t.Helper()
+	if want == nil {
+		AssertNil(t, got)
+	}
+	AssertNotNil(t, got)
+	wantSD := unsafe.SliceData(want) // #nosec G103
+	gotSD := unsafe.SliceData(got)   // #nosec G103
+	AssertEq(t, wantSD, gotSD)
+}
+
+func AssertNotSameSlice[T any](
+	t *testing.T,
+	notWant []T,
+	got []T,
+	msg ...string,
+) {
+	t.Helper()
+	if notWant == nil {
+		AssertNotNil(t, got)
+	}
+	if got == nil {
+		return
+	}
+	AssertNotNil(t, got)
+	wantSD := unsafe.SliceData(notWant) // #nosec G103
+	gotSD := unsafe.SliceData(got)      // #nosec G103
+	AssertNotEq(t, wantSD, gotSD)
+}
+
+func AssertEqual[T any](
+	t *testing.T,
+	want T,
+	got T,
+	msg ...string,
+) {
+	t.Helper()
+	if reflect.DeepEqual(got, want) {
+		return
+	}
+	if len(msg) > 0 {
+		t.Fatalf("%s: want %v, got %v", msg[0], want, got)
+	} else {
+		t.Fatalf("want %v, got %v", want, got)
+	}
+}
 
 func AssertEq[T comparable](
 	t *testing.T,
@@ -88,6 +141,22 @@ func AssertEqOk[T comparable](
 		t.Fatalf("%s: want (%v, true), got (%v, %v)", msg[0], want, got, gotOK)
 	} else {
 		t.Fatalf("want (%v, true), got (%v, %v)", want, got, gotOK)
+	}
+}
+
+func AssertNil[T any](
+	t *testing.T,
+	got T,
+	msg ...string,
+) {
+	t.Helper()
+	if IsNil(got) {
+		return
+	}
+	if len(msg) > 0 {
+		t.Fatalf("%s: expected nil", msg[0])
+	} else {
+		t.Fatal("expected nil")
 	}
 }
 
@@ -310,4 +379,16 @@ func IsNil[T any](x T) bool {
 		return v.IsNil()
 	}
 	return false
+}
+
+func IsSameSlice[T any](
+	a []T,
+	b []T,
+) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	aSD := unsafe.SliceData(a) // #nosec G103
+	bSD := unsafe.SliceData(b) // #nosec G103
+	return aSD == bSD
 }

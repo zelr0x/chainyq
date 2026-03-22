@@ -44,6 +44,14 @@ func BenchmarkPushBack(b *testing.B) {
 			d.PushBack(i)
 		}
 	})
+	b.Run("chainyq.Deque_Reserve", func(b *testing.B) {
+		d := New[int]()
+		d.ReserveBack(b.N)
+		b.ResetTimer()
+		for i := range b.N {
+			d.PushBack(i)
+		}
+	})
 	b.Run("chainyq.Deque_Ensure", func(b *testing.B) {
 		d := New[int]()
 		d.EnsureBack(b.N)
@@ -97,6 +105,14 @@ func BenchmarkPushFront(b *testing.B) {
 		b.ResetTimer()
 		for i := range b.N {
 			d.PushFront(i)
+		}
+	})
+	b.Run("chainyq.Deque_Reserve", func(b *testing.B) {
+		d := New[int]()
+		d.ReserveFront(b.N)
+		b.ResetTimer()
+		for i := range b.N {
+			d.PushBack(i)
 		}
 	})
 	b.Run("chainyq.Deque_Ensure", func(b *testing.B) {
@@ -184,6 +200,28 @@ func BenchmarkChurn(b *testing.B) {
 	b.Run("chainyq.Deque_Pooled", func(b *testing.B) {
 		a := RandomIntSlice(b, seed, 4)
 		d := NewPooled[int]()
+		var sink int
+		b.ResetTimer()
+		for i := range b.N {
+			switch a[i] {
+			case 0:
+				d.PushBack(i)
+			case 1:
+				d.PushFront(i)
+			case 2:
+				x, _ := d.PopBack()
+				sink = x
+			case 3:
+				x, _ := d.PopFront()
+				sink = x
+			}
+		}
+		Sink = sink
+	})
+	b.Run("chainyq.Deque_Reserve", func(b *testing.B) {
+		a := RandomIntSlice(b, seed, 4)
+		d := New[int]()
+		d.Reserve(b.N/3, b.N/3)
 		var sink int
 		b.ResetTimer()
 		for i := range b.N {

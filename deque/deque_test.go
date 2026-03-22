@@ -293,6 +293,46 @@ func TestPushFrontAndPushBack(t *testing.T) {
 	AssertEq(t, 3, d.Len())
 }
 
+func TestPushFront1M(t *testing.T) {
+	d := New[int]()
+	n := 1_000_000
+	want := make([]int, 0, n)
+	for i := range n {
+		d.PushFront(i)
+		want = append(want, i)
+	}
+	want = ReversedSlice(want)
+	got := d.ToSlice()
+	AssertSliceEq(t, want, got)
+}
+
+func TestPooledPushFront1M(t *testing.T) {
+	d := WithCfg[int](defCfgPooled)
+	n := 1_000_000
+	want := make([]int, 0, n)
+	for i := range n {
+		d.PushFront(i)
+		want = append(want, i)
+	}
+	want = ReversedSlice(want)
+	got := d.ToSlice()
+	AssertSliceEq(t, want, got)
+}
+
+func TestReserveFrontPushFront1M(t *testing.T) {
+	d := New[int]()
+	n := 1_000_000
+	d.ReserveFront(n)
+	want := make([]int, 0, n)
+	for i := range n {
+		d.PushFront(i)
+		want = append(want, i)
+	}
+	want = ReversedSlice(want)
+	got := d.ToSlice()
+	AssertSliceEq(t, want, got)
+}
+
 func TestPushBack1M(t *testing.T) {
 	d := New[int]()
 	n := 1_000_000
@@ -308,6 +348,19 @@ func TestPushBack1M(t *testing.T) {
 func TestPooledPushBack1M(t *testing.T) {
 	d := WithCfg[int](defCfgPooled)
 	n := 1_000_000
+	want := make([]int, 0, n)
+	for i := range n {
+		d.PushBack(i)
+		want = append(want, i)
+	}
+	got := d.ToSlice()
+	AssertSliceEq(t, want, got)
+}
+
+func TestReserveBackPushBack1M(t *testing.T) {
+	d := New[int]()
+	n := 1_000_000
+	d.ReserveBack(n)
 	want := make([]int, 0, n)
 	for i := range n {
 		d.PushBack(i)
@@ -471,6 +524,209 @@ func TestGetLarge(t *testing.T) {
 			want := slice[idx]
 			AssertEqOk(t, want, got, ok)
 		})
+	}
+}
+
+func TestReserveNOOP(t *testing.T) {
+	smallSlice := SliceFromRangeExcl(t, 1, 10)
+	largeSlice := SliceFromRangeExcl(t, 1, SuggestBlockSize[int]()*defSideCapBlocks+5)
+	tests := []struct {
+		name       string
+		d          *Deque[int]
+		frontItems int
+		backItems  int
+	}{
+		{"empty, 0 0", New[int](), 0, 0},
+		{"non-empty, 0 0", FromSlice(smallSlice), 0, 0},
+		{"large, 0 0", FromSlice(largeSlice), 0, 0},
+
+		{"empty, 0 -1", New[int](), 0, -1},
+		{"non-empty, 0 -1", FromSlice(smallSlice), 0, -1},
+		{"large, 0 -1", FromSlice(largeSlice), 0, -1},
+
+		{"empty, -1 0", New[int](), -1, 0},
+		{"non-empty, -1 0", FromSlice(smallSlice), -1, 0},
+		{"large, -1 0", FromSlice(largeSlice), -1, 0},
+
+		{"empty, -1 -1", New[int](), -1, -1},
+		{"non-empty, -1 -1", FromSlice(smallSlice), -1, -1},
+		{"large, -1 -1", FromSlice(largeSlice), -1, -1},
+
+		{"empty, 0 5", New[int](), 0, 5},
+		{"non-empty, 0 5", FromSlice(smallSlice), 0, 5},
+		{"large, 0 5", FromSlice(largeSlice), 0, 5},
+
+		{"empty, 5 0", New[int](), 5, 0},
+		{"non-empty, 5 0", FromSlice(smallSlice), 5, 0},
+		{"large, 5 0", FromSlice(largeSlice), 5, 0},
+
+		{"empty, -1 500", New[int](), -1, 500},
+		{"non-empty, -1 500", FromSlice(smallSlice), -1, 500},
+		{"large, -1 500", FromSlice(largeSlice), -1, 500},
+
+		{"empty, 500 -1", New[int](), 500, -1},
+		{"non-empty, 500 -1", FromSlice(smallSlice), 500, -1},
+		{"large, 500 -1", FromSlice(largeSlice), 500, -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := tt.d
+			oldMap := d.m
+			oldLen := d.Len()
+			d.Reserve(tt.frontItems, tt.backItems)
+			AssertEq(t, oldLen, d.Len())
+			AssertSameSlice(t, oldMap, d.m)
+		})
+	}
+}
+
+func TestReserveFront(t *testing.T) {
+	d := New[int]()
+	blockSize := d.blockSize
+
+	initMap := d.m
+
+	// determine the number of items to trigger growth
+	initialCap := cap(d.m)
+	var itemsToGrow int
+	for {
+		oldCap := cap(d.m)
+		d.PushFront(0)
+		if cap(d.m) != oldCap {
+			break
+		}
+		itemsToGrow++
+	}
+	AssertNotSameSlice(t, initMap, d.m)
+
+	// reset deque
+	d = New[int]()
+	initMap = d.m
+
+	// push exactly itemsToGrow, map should not grow
+	for i := range itemsToGrow {
+		d.PushFront(i)
+	}
+	AssertEqual(t, initialCap, cap(d.m))
+	AssertSameSlice(t, initMap, d.m)
+
+	// save old blocks
+	usedBlocks := d.back.blk - d.front.blk + 1
+	oldBlocks := make([][]int, usedBlocks)
+	for i := range usedBlocks {
+		oldBlocks[i] = d.m[d.front.blk+i]
+	}
+
+	// reserve itemsToGrow + 1 and verify growth with reuse
+	d.Reserve(itemsToGrow+1, 0)
+
+	neededFrontBlocks := (itemsToGrow + 1 + blockSize - 1) / blockSize
+	AssertTrue(t, cap(d.m) >= neededFrontBlocks+usedBlocks)
+	AssertEq(t, usedBlocks, d.back.blk-d.front.blk+1)
+	for i := range usedBlocks {
+		AssertSameSlice(t, oldBlocks[i], d.m[d.front.blk+i])
+	}
+}
+
+func TestReserveBack(t *testing.T) {
+	d := New[int]()
+	blockSize := d.blockSize
+
+	initMap := d.m
+
+	// determine the number of items to trigger growth
+	initialCap := cap(d.m)
+	var itemsToGrow int
+	for {
+		oldCap := cap(d.m)
+		d.PushBack(0)
+		if cap(d.m) != oldCap {
+			break
+		}
+		itemsToGrow++
+	}
+	AssertNotSameSlice(t, initMap, d.m)
+
+	// reset deque
+	d = New[int]()
+	initMap = d.m
+
+	// push exactly itemsToGrow, map should not grow
+	for i := range itemsToGrow {
+		d.PushBack(i)
+	}
+	AssertEqual(t, initialCap, cap(d.m))
+	AssertSameSlice(t, initMap, d.m)
+
+	// save old blocks
+	usedBlocks := d.back.blk - d.front.blk + 1
+	oldBlocks := make([][]int, usedBlocks)
+	for i := range usedBlocks {
+		oldBlocks[i] = d.m[d.front.blk+i]
+	}
+
+	// reserve itemsToGrow + 1 and verify growth with reuse
+	d.Reserve(0, itemsToGrow+1)
+
+	neededBackBlocks := (itemsToGrow + 1 + blockSize - 1) / blockSize
+	AssertTrue(t, cap(d.m) >= neededBackBlocks+usedBlocks)
+	AssertEq(t, usedBlocks, d.back.blk-d.front.blk+1)
+
+	for i := range usedBlocks {
+		AssertSameSlice(t, oldBlocks[i], d.m[d.front.blk+i])
+	}
+}
+
+func TestReserveFrontAndBack(t *testing.T) {
+	d := New[int]()
+	blockSize := d.blockSize
+
+	initMap := d.m
+
+	// determine the number of items to trigger growth
+	initialCap := cap(d.m)
+	var itemsToGrow int
+	for {
+		d.PushBack(0)
+		if cap(d.m) != initialCap {
+			break
+		}
+		itemsToGrow++
+	}
+	AssertNotSameSlice(t, initMap, d.m)
+
+	// reset deque
+	d = New[int]()
+	initMap = d.m
+
+	// fill at both ends (half front, half back)
+	// TODO: can be improved - it's not an API guarantee, but it will do for now
+	half := itemsToGrow / 2
+	for i := range half {
+		d.PushFront(i)
+		d.PushBack(i)
+	}
+	AssertSameSlice(t, initMap, d.m)
+
+	// save old blocks
+	usedBlocks := d.back.blk - d.front.blk + 1
+	oldBlocks := make([][]int, usedBlocks)
+	for i := range usedBlocks {
+		oldBlocks[i] = d.m[d.front.blk+i]
+	}
+
+	// now reserve front+back growth
+	frontItems := half + 1
+	backItems := half + 1
+	d.Reserve(frontItems, backItems)
+
+	neededFrontBlocks := (frontItems + blockSize - 1) / blockSize
+	neededBackBlocks := (backItems + blockSize - 1) / blockSize
+	AssertTrue(t, cap(d.m) >= neededFrontBlocks+neededBackBlocks+usedBlocks)
+	AssertEq(t, usedBlocks, d.back.blk-d.front.blk+1)
+
+	for i := range usedBlocks {
+		AssertSameSlice(t, oldBlocks[i], d.m[d.front.blk+i])
 	}
 }
 

@@ -35,9 +35,29 @@ func (di DequeIntrospector[T]) FrontIndex() (blk, off int) {
 	return di.d.front.blk, di.d.front.off
 }
 
+// FrontBlk returns the front block.
+func (di DequeIntrospector[T]) FrontBlk() int {
+	return di.d.front.blk
+}
+
+// FrontBlk returns the front offset.
+func (di DequeIntrospector[T]) FrontOff() int {
+	return di.d.front.off
+}
+
 // BackIndex returns the back block/off index.
 func (di DequeIntrospector[T]) BackIndex() (blk, off int) {
 	return di.d.back.blk, di.d.back.off
+}
+
+// BackBlk returns the back block.
+func (di DequeIntrospector[T]) BackBlk() int {
+	return di.d.front.blk
+}
+
+// BackBlk returns the back offset.
+func (di DequeIntrospector[T]) BackOff() int {
+	return di.d.front.off
 }
 
 // BlockSize returns the deque block size.

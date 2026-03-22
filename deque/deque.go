@@ -46,12 +46,22 @@ type DequeCfg struct {
 	// without reallocating the deque. Note that this is not the same
 	// as preallocating the blocks themselves. For that use [EnsureFront]
 	// and [EnsureBack] after creation.
+	//
+	// You can also reserve space after the deque is creeated with [Reserve]
+	// or [ReserveFront], but it's better to specify it here if you know
+	// the wanted capacity before deque creation to not risk wasting
+	// the initial allocation.
 	FrontCap int
 
 	// BackCap is the number of items you can push to the back
 	// without reallocating the deque. Note that this is not the same
 	// as preallocating the blocks themselves. For that use [EnsureFront]
 	// and [EnsureBack] after creation.
+	//
+	// You can also reserve space after the deque is creeated with [Reserve]
+	// or [ReserveBack], but it's better to specify it here if you know
+	// the wanted capacity before deque creation to not risk wasting
+	// the initial allocation.
 	BackCap int
 
 	// Pooled specifies if object pool should be used. See [PreallocPool].
@@ -555,6 +565,69 @@ func (d *Deque[T]) Set(idx int, v T) (T, bool) {
 	return old, true
 }
 
+// ReserveFront is an alias for Reserve(items, 0).
+// See [Reserve].
+func (d *Deque[T]) ReserveFront(items int) {
+	d.Reserve(items, 0)
+}
+
+// ReserveBack is an alias for Reserve(0, items).
+// See [Reserve].
+func (d *Deque[T]) ReserveBack(items int) {
+	d.Reserve(0, items)
+}
+
+// Reserve grows the deque's internal map of blocks (slice)
+// to avoid further costs associated with map growth, but does not
+// preallocate the blocks themselves.
+//
+// If the requested number of items can fit into the current capacity,
+// Reserve is a noop. Otherwise it allocates a new map large enough
+// to hold the existing blocks plus the blocks required for the requested
+// number of items at each side, then copies the slice headers of existing
+// blocks.
+//
+// The allocated map has capacity roughly equal to
+// Len/BlockSize + (frontItems+backItems)/BlockSize.
+// This uses much less memory than [EnsureFront] and [EnsureBack], since
+// those also allocate the blocks themselves. Reserve eliminates
+// up to log2((frontItems+backItems)/BlockSize) future map growths,
+// assuming the map is nearly full when Reserve is called.
+//
+// If either of the arguments is negative, the function returns immediately.
+func (d *Deque[T]) Reserve(frontItems, backItems int) {
+	if frontItems < 0 || backItems < 0 {
+		return
+	}
+	if frontItems == 0 && backItems == 0 {
+		return
+	}
+
+	mask := d.blockMask
+	shift := d.blockShift
+	frontBlocks := (frontItems + mask) >> shift
+	backBlocks := (backItems + mask) >> shift
+
+	usedBlocks := d.back.blk - d.front.blk + 1
+
+	slackFront := d.front.blk
+	slackBack := cap(d.m) - d.back.blk - 1
+	if frontBlocks <= slackFront && backBlocks <= slackBack {
+		return // Items can fit without growing the map.
+	}
+
+	neededBlocks := frontBlocks + usedBlocks + backBlocks
+	newCap := numutil.MaxInt(cap(d.m)*2, neededBlocks)
+
+	start := frontBlocks
+	d.m = d.makeMapWithSlack(newCap, start, usedBlocks, 0)
+
+	d.front.blk = start
+	d.back.blk = start + usedBlocks - 1
+}
+
+// TODO: add Ensure(front, back)
+
 // EnsureFront grows the deque to allow at least the specified number of items
 // to be pushed to the front before the next allocation occurs. Note that this
 // does not change the empty space at the back, so if you need to push n items
@@ -562,6 +635,9 @@ func (d *Deque[T]) Set(idx int, v T) (T, bool) {
 // call EnsureFront(n) and by EnsureBack(m) together.
 //
 // See [EnsureBack] for the same operation at the back of the deque.
+//
+// If you want to reserve the space in the deque without eagerly allocating
+// the blocks themselves, use [ReserveFront] or [Reserve] instead.
 func (d *Deque[T]) EnsureFront(items int) {
 	if items < 1 {
 		return
@@ -587,6 +663,9 @@ func (d *Deque[T]) EnsureFront(items int) {
 // call EnsureFront(n) and by EnsureBack(m) together.
 //
 // See [EnsureFront] for the same operation at the front of the deque.
+//
+// If you want to reserve the space in the deque without eagerly allocating
+// the blocks themselves, use [ReserveBack] or [Reserve] instead.
 func (d *Deque[T]) EnsureBack(items int) {
 	if items < 1 {
 		return

@@ -166,15 +166,15 @@ func main() {
 `chainyq.deque` package provides constructors `New`/`NewPooled`/`WithCfg`/`NewValue`/`FromSlice`/`FromSliceCfg` and helpers `SuggestBlockSize`/`Len`.
 
 The API of the deque itself consists of:
-- General collection operations: `Len`/`IsEmpty`
-- Peeks: `Front`/`FrontPtr`/`Back`/`BackPtr`
-- Mutations: `PushFront`/`PushBack`/`PopFront`/`PopBack`
-- Random access operations: `Get`/`GetPtr`/`Set`
-- Memory control: `EnsureFront`/`EnsureBack`/`ShrinkToFit`/`Clear`/`ClearRelease`
-- Iterators: `Iter`/`RevIter`/`BidiIter`
-- Misc: `String`/`GoString`/`Equals`
-- Slicing: `Slice`/`PtrSlice`
-- Collecting: `ToSlice`/`ToPtrSlice`/`ToChan`/`ToPtrChan`
+- General collection operations: `Len`, `IsEmpty`
+- Peeks: `Front`, `FrontPtr`, `Back`, `BackPtr`
+- Mutations: `PushFront`, `PushBack`, `PopFront`, `PopBack`
+- Random access operations: `Get`, `GetPtr`, `Set`
+- Memory control: `Reserve`, `ReserveFront`, `ReserveBack`, `EnsureFront`, `EnsureBack`, `ShrinkToFit`, `Clear`, `ClearRelease`
+- Iterators: `Iter`, `RevIter`, `BidiIter`
+- Misc: `String`, `GoString`, `Equals`
+- Slicing: `Slice`, `PtrSlice`
+- Collecting: `ToSlice`, `ToPtrSlice`, `ToChan`, `ToPtrChan`
 
 See docs for the full API.
 
