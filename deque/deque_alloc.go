@@ -48,17 +48,17 @@ func (a *dequeAlloc[T]) PreallocBlocks(n int) {
 	a.pool.Ensure(n)
 	blockSize := a.blockSize
 	for range n {
-		a.pool.Push(Allocate[T](blockSize))
+		a.pool.Push(allocate[T](blockSize))
 	}
 }
 
 func (a *dequeAlloc[T]) NewBlock() []T {
 	if !a.pooled {
-		return Allocate[T](a.blockSize)
+		return allocate[T](a.blockSize)
 	}
 	v, ok := a.pool.Pop()
 	if !ok {
-		return Allocate[T](a.blockSize)
+		return allocate[T](a.blockSize)
 	}
 	return v
 }
@@ -74,6 +74,6 @@ func (a *dequeAlloc[T]) ReleaseAll() {
 	}
 }
 
-func Allocate[T any](blockSize int) []T {
+func allocate[T any](blockSize int) []T {
 	return make([]T, blockSize)
 }
