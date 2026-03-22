@@ -1,0 +1,95 @@
+# Inspired by https://github.com/caddyserver/caddy/blob/master/.github/workflows/ci.yml
+
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+env:
+  # https://github.com/actions/setup-go/issues/491
+  GOTOOLCHAIN: local
+
+jobs:
+  test:
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: write # to allow uploading artifacts and cache
+    strategy:
+      # Default is true, cancels jobs for other platforms in the matrix if one fails
+      fail-fast: false
+      matrix:
+        os:
+          - linux
+          - mac
+          - windows
+        go:
+          - '1.26'
+
+        include:
+          # Set the minimum Go patch version for the given Go minor
+        - go: '1.26'
+          GO_SEMVER: '~1.26.0' # Usable via ${{ matrix.GO_SEMVER }}
+
+        - os: linux
+          OS_LABEL: ubuntu-latest
+
+        - os: mac
+          OS_LABEL: macos-14
+
+        - os: windows
+          OS_LABEL: windows-latest
+
+    runs-on: ${{ matrix.OS_LABEL }}
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version: ${{ matrix.GO_SEMVER }}
+          check-latest: true
+
+      - name: Print Go version and environment
+        id: vars
+        shell: bash
+        run: |
+          printf "Using go at: $(which go)\n"
+          printf "Go version: $(go version)\n"
+          printf "\n\nGo environment:\n\n"
+          go env
+          printf "\n\nSystem environment:\n\n"
+          env
+          printf "Git version: $(git version)\n\n"
+          # Calculate the short SHA1 hash of the git commit
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+
+      - name: Test with coverage
+        run: go test ./... -coverprofile=coverage.out
+      
+      - name: Test concurrent
+        run: go test -race ./deque/syncdeque
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5.5.3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
