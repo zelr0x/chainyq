@@ -32,12 +32,13 @@ func AssertSameSlice[T any](
 ) {
 	t.Helper()
 	if want == nil {
-		AssertNil(t, got)
+		AssertNil(t, got, msg...)
+		return
 	}
-	AssertNotNil(t, got)
+	AssertNotNil(t, got, msg...)
 	wantSD := unsafe.SliceData(want) // #nosec G103
 	gotSD := unsafe.SliceData(got)   // #nosec G103
-	AssertEq(t, wantSD, gotSD)
+	AssertEq(t, wantSD, gotSD, msg...)
 }
 
 func AssertNotSameSlice[T any](
@@ -48,15 +49,16 @@ func AssertNotSameSlice[T any](
 ) {
 	t.Helper()
 	if notWant == nil {
-		AssertNotNil(t, got)
+		AssertNotNil(t, got, msg...)
+		return
 	}
 	if got == nil {
 		return
 	}
-	AssertNotNil(t, got)
+	AssertNotNil(t, got, msg...)
 	wantSD := unsafe.SliceData(notWant) // #nosec G103
 	gotSD := unsafe.SliceData(got)      // #nosec G103
-	AssertNotEq(t, wantSD, gotSD)
+	AssertNotEq(t, wantSD, gotSD, msg...)
 }
 
 func AssertEqual[T any](

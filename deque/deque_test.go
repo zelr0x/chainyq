@@ -730,6 +730,110 @@ func TestReserveFrontAndBack(t *testing.T) {
 	}
 }
 
+func TestEnsureFrontAllocatesAndPreservesBackSlack(t *testing.T) {
+	d := New[int]()
+	blockSize := d.blockSize
+
+	for i := 0; i < blockSize+3; i++ {
+		d.PushBack(i)
+	}
+
+	oldMap := d.m
+	oldFrontBlk := d.front.blk
+	oldBackBlk := d.back.blk
+
+	oldBackSlack := cap(oldMap) - oldBackBlk - 1
+
+	usedBlocks := oldBackBlk - oldFrontBlk + 1
+	oldBlocks := make([][]int, usedBlocks)
+	for i := range usedBlocks {
+		oldBlocks[i] = oldMap[oldFrontBlk+i]
+	}
+
+	// Count already allocated blocks before the front
+	allocatedBefore := 0
+	for i := oldFrontBlk - 1; i >= 0; i-- {
+		if oldMap[i] != nil {
+			allocatedBefore++
+		}
+	}
+
+	// Request space larger than existing front capacity to force growth
+	items := blockSize*3 + 5
+
+	d.EnsureFront(items)
+
+	// Verify back slack preserved
+	newBackSlack := cap(d.m) - d.back.blk - 1
+	AssertEq(t, oldBackSlack, newBackSlack)
+
+	// Verify used blocks copied, not reallocated
+	newFrontBlk := d.front.blk
+	newBackBlk := d.back.blk
+	newUsedBlocks := newBackBlk - newFrontBlk + 1
+
+	AssertEq(t, usedBlocks, newUsedBlocks)
+
+	for i := range usedBlocks {
+		AssertSameSlice(t, oldBlocks[i], d.m[newFrontBlk+i])
+	}
+
+	// Verify required front blocks allocated
+	requiredBlocks := (items + blockSize - 1) / blockSize
+
+	remaining := items
+	for i := newFrontBlk - 1; remaining > 0 && i >= 0; i-- {
+		AssertNotNil(t, d.m[i])
+		remaining -= blockSize
+	}
+
+	// Verify blocks that were nil before got allocated
+	for i := newFrontBlk - requiredBlocks; i < newFrontBlk; i++ {
+		if i >= 0 {
+			AssertNotNil(t, d.m[i])
+		}
+	}
+
+	// Verify old map not reused when growth occurred
+	if cap(oldMap) != cap(d.m) {
+		AssertNotSameSlice(t, oldMap, d.m)
+	}
+}
+
+// Tests that there is strictly zero allocations after EnsureFront(n)
+// and before PushFront(n+k) items where k > 0.
+func TestEnsureFrontZeroAllocGuarantee(t *testing.T) {
+	tests := []int{
+		0,
+		1,
+		defSideCapBlocks * SuggestBlockSize[int](),
+		defSideCapBlocks * SuggestBlockSize[int]() * 2,
+		100000,
+	}
+	for _, n := range tests {
+		t.Run(fmt.Sprintf("EnsureFront(%d)", n), func(t *testing.T) {
+			d := New[int]()
+			d.EnsureFront(n)
+
+			oldMap := d.m
+			oldCap := cap(d.m)
+			oldEntries := make([][]int, cap(oldMap))
+			copy(oldEntries, oldMap)
+
+			for i := range n {
+				d.PushFront(i)
+			}
+
+			AssertSameSlice(t, oldMap, d.m, "Map must not be replaced")
+			AssertEq(t, oldCap, cap(d.m), "Map must have the same capacity")
+			AssertEq(t, len(oldEntries), len(d.m), "All blocks should be the same")
+			for i := range oldEntries {
+				AssertSameSlice(t, oldEntries[i], d.m[i], fmt.Sprintf("mismatch at index %d", i))
+			}
+		})
+	}
+}
+
 func TestGetPtrMutation(t *testing.T) {
 	d := FromSlice([]int{1, 2, 3})
 	ptr, ok := d.GetPtr(1)

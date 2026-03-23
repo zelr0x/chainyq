@@ -603,27 +603,11 @@ func (d *Deque[T]) Reserve(frontItems, backItems int) {
 		return
 	}
 
-	mask := d.blockMask
-	shift := d.blockShift
-	frontBlocks := (frontItems + mask) >> shift
-	backBlocks := (backItems + mask) >> shift
+	frontBlocks := d.blocksForCapCeil(frontItems)
+	backBlocks := d.blocksForCapCeil(backItems)
 
-	usedBlocks := d.back.blk - d.front.blk + 1
-
-	slackFront := d.front.blk
-	slackBack := cap(d.m) - d.back.blk - 1
-	if frontBlocks <= slackFront && backBlocks <= slackBack {
-		return // Items can fit without growing the map.
-	}
-
-	neededBlocks := frontBlocks + usedBlocks + backBlocks
-	newCap := numutil.MaxInt(cap(d.m)*2, neededBlocks)
-
-	start := frontBlocks
-	d.m = d.makeMapWithSlack(newCap, start, usedBlocks, 0)
-
-	d.front.blk = start
-	d.back.blk = start + usedBlocks - 1
+	d.reserveBlocks(frontBlocks, backBlocks)
+	// don't forget to reload d.m / d.front / d.back if cached
 }
 
 // TODO: add Ensure(front, back)
@@ -646,6 +630,8 @@ func (d *Deque[T]) EnsureFront(items int) {
 	front := d.front
 	if blockSize*front.blk+front.off < items {
 		d.growFrontBy(items)
+		// Required: reload front to not use stale copy.
+		front = d.front
 	}
 	remaining := items
 	for i := front.blk - 1; remaining > 0 && i >= 0; i-- {
@@ -674,6 +660,8 @@ func (d *Deque[T]) EnsureBack(items int) {
 	blockSize := d.blockSize
 	if blockSize*(len(d.m)-1-back.blk)+(blockSize-back.off-1) < items {
 		d.growBackBy(items)
+		// Defensive: reload back
+		back = d.back
 	}
 	remaining := items
 	for i := back.blk + 1; remaining > 0 && i < len(d.m); i++ {
@@ -893,65 +881,99 @@ func (d *Deque[T]) resetToInit() {
 }
 
 func (d *Deque[T]) growFrontBy(n int) {
-	front := d.front
 	back := d.back
+	m := d.m
 	if d.a.pooled {
 		if i := back.blk + 1; i < len(d.m) {
 			// Blocks after back+1 are reclaimed on PopBack.
-			backNextBlk := d.m[i]
+			backNextBlk := m[i]
 			if backNextBlk != nil {
 				d.a.ReclaimBlock(backNextBlk)
 			}
 		}
 	}
 
-	oldCap := cap(d.m)
-	usedBlocks := back.blk - front.blk + 1
+	allocBlkBeforeFront := 0
+	for i := d.front.blk - 1; i >= 0; i-- {
+		if m[i] == nil {
+			break
+		}
+		allocBlkBeforeFront++
+	}
+
 	extraBlocks := d.blocksForCapCeil(n)
-
-	newCap := numutil.MaxInt(oldCap*2, usedBlocks+extraBlocks)
-	// Position old slice headers keeping the same slack at the back as before
-	start := newCap - extraBlocks - usedBlocks
-
-	d.m = d.makeMapWithSlack(newCap, start, usedBlocks, extraBlocks)
-	d.front.blk = start
-	d.back.blk = start + usedBlocks - 1
+	d.reserveBlocks(extraBlocks, 0)
+	// don't forget to reload d.m / d.front / d.back if cached
+	m = d.m
+	need := extraBlocks - allocBlkBeforeFront
+	start := d.front.blk - allocBlkBeforeFront - 1
+	for i := range need {
+		m[start-i] = d.a.NewBlock()
+	}
 }
 
 func (d *Deque[T]) growBackBy(n int) {
 	front := d.front
 	back := d.back
+	m := d.m
 	if d.a.pooled && front.blk > 0 {
 		// Blocks before front+1 are reclaimed on PopFront.
 		i := front.blk - 1
-		frontPrevBlk := d.m[i]
+		frontPrevBlk := m[i]
 		if frontPrevBlk != nil {
 			d.a.ReclaimBlock(frontPrevBlk)
 		}
 	}
 
-	oldCap := cap(d.m)
+	allocBlkAfterBack := 0
+	for i := back.blk + 1; i < len(d.m); i++ {
+		if m[i] == nil {
+			break
+		}
+		allocBlkAfterBack++
+	}
 
-	usedBlocks := back.blk - front.blk + 1
 	extraBlocks := d.blocksForCapCeil(n)
-	neededBlocks := usedBlocks + extraBlocks
+	d.reserveBlocks(0, extraBlocks)
+	// don't forget to reload d.m / d.front / d.back if cached
+	m = d.m
 
-	// Position old slice headers keeping the same slack at the front as before
-	start := front.blk
-	newCap := numutil.MaxInt(oldCap*2, start+neededBlocks)
+	need := extraBlocks - allocBlkAfterBack
+	start := d.back.blk + allocBlkAfterBack + 1
+	for i := range need {
+		m[start+i] = d.a.NewBlock()
+	}
+}
 
-	d.m = d.makeMapWithSlack(newCap, start, usedBlocks, extraBlocks)
+// ReserveBlocks is the same as Reserve but in blocks and unchecked.
+// Don't forget to reload d.m, d.front, and d.back if cached.
+func (d *Deque[T]) reserveBlocks(frontBlocks, backBlocks int) {
+	usedBlocks := d.back.blk - d.front.blk + 1
+	frontSlack := d.front.blk
+	backSlack := cap(d.m) - d.back.blk - 1
+	if frontBlocks <= frontSlack && backBlocks <= backSlack {
+		return // Items can fit without growing the map.
+	}
+
+	neededFront := numutil.MaxInt(frontSlack, frontBlocks)
+	neededBack := numutil.MaxInt(backSlack, backBlocks)
+	neededBlocks := neededFront + usedBlocks + neededBack
+	newCap := numutil.MaxInt(cap(d.m)*2, neededBlocks)
+
+	start := neededFront
+	if frontBlocks > backBlocks {
+		start = newCap - usedBlocks - neededBack
+	}
+	d.m = d.makeMapWithSlack(newCap, start, usedBlocks)
+
 	d.front.blk = start
 	d.back.blk = start + usedBlocks - 1
 }
 
-func (d *Deque[T]) makeMapWithSlack(newCap, start, usedBlocks, extraBlocks int) [][]T {
+func (d *Deque[T]) makeMapWithSlack(newCap, start, usedBlocks int) [][]T {
 	m := make([][]T, newCap)
 	for i := range usedBlocks {
 		m[start+i] = d.m[d.front.blk+i]
-	}
-	for i := range extraBlocks {
-		m[start+usedBlocks+i] = d.a.NewBlock()
 	}
 	return m
 }
