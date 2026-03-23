@@ -565,16 +565,24 @@ func (d *Deque[T]) Set(idx int, v T) (T, bool) {
 	return old, true
 }
 
-// ReserveFront is an alias for Reserve(items, 0).
-// See [Reserve].
+// ReserveFront is the same as Reserve(items, 0), but slightly faster.
+// See [Reserve], [ReserveBack].
 func (d *Deque[T]) ReserveFront(items int) {
-	d.Reserve(items, 0)
+	if items <= 0 {
+		return
+	}
+	n := d.blocksForCapCeil(items)
+	d.reserveFrontBlocks(n)
 }
 
-// ReserveBack is an alias for Reserve(0, items).
-// See [Reserve].
+// ReserveBack is the same as Reserve(0, items), but slightly faster.
+// See [Reserve], [ReserveFront].
 func (d *Deque[T]) ReserveBack(items int) {
-	d.Reserve(0, items)
+	if items <= 0 {
+		return
+	}
+	n := d.blocksForCapCeil(items)
+	d.reserveBackBlocks(n)
 }
 
 // Reserve grows the deque's internal map of blocks (slice)
@@ -607,7 +615,6 @@ func (d *Deque[T]) Reserve(frontItems, backItems int) {
 	backBlocks := d.blocksForCapCeil(backItems)
 
 	d.reserveBlocks(frontBlocks, backBlocks)
-	// don't forget to reload d.m / d.front / d.back if cached
 }
 
 // TODO: add Ensure(front, back)
@@ -902,7 +909,7 @@ func (d *Deque[T]) growFrontBy(n int) {
 	}
 
 	extraBlocks := d.blocksForCapCeil(n)
-	d.reserveBlocks(extraBlocks, 0)
+	d.reserveFrontBlocks(extraBlocks)
 	// don't forget to reload d.m / d.front / d.back if cached
 	m = d.m
 	need := extraBlocks - allocBlkBeforeFront
@@ -934,7 +941,7 @@ func (d *Deque[T]) growBackBy(n int) {
 	}
 
 	extraBlocks := d.blocksForCapCeil(n)
-	d.reserveBlocks(0, extraBlocks)
+	d.reserveBackBlocks(extraBlocks)
 	// don't forget to reload d.m / d.front / d.back if cached
 	m = d.m
 
@@ -945,7 +952,7 @@ func (d *Deque[T]) growBackBy(n int) {
 	}
 }
 
-// ReserveBlocks is the same as Reserve but in blocks and unchecked.
+// reserveBlocks is the same as Reserve but in blocks and unchecked.
 // Don't forget to reload d.m, d.front, and d.back if cached.
 func (d *Deque[T]) reserveBlocks(frontBlocks, backBlocks int) {
 	usedBlocks := d.back.blk - d.front.blk + 1
@@ -964,6 +971,48 @@ func (d *Deque[T]) reserveBlocks(frontBlocks, backBlocks int) {
 	if frontBlocks > backBlocks {
 		start = newCap - usedBlocks - neededBack
 	}
+	d.m = d.makeMapWithSlack(newCap, start, usedBlocks)
+
+	d.front.blk = start
+	d.back.blk = start + usedBlocks - 1
+}
+
+// reserveFrontBlocks is the same as reserveBlocks but at front only.
+// Don't forget to reload d.m, d.front, and d.back if cached.
+func (d *Deque[T]) reserveFrontBlocks(n int) {
+	usedBlocks := d.back.blk - d.front.blk + 1
+	frontSlack := d.front.blk
+	backSlack := cap(d.m) - d.back.blk - 1
+	if n <= frontSlack {
+		return // Items can fit without growing the map.
+	}
+
+	neededFront := numutil.MaxInt(frontSlack, n)
+	neededBlocks := neededFront + usedBlocks + backSlack
+	newCap := numutil.MaxInt(cap(d.m)*2, neededBlocks)
+
+	start := newCap - usedBlocks - backSlack
+	d.m = d.makeMapWithSlack(newCap, start, usedBlocks)
+
+	d.front.blk = start
+	d.back.blk = start + usedBlocks - 1
+}
+
+// reserveBackBlocks is the same as reserveBlocks but at front only.
+// Don't forget to reload d.m, d.front, and d.back if cached.
+func (d *Deque[T]) reserveBackBlocks(n int) {
+	usedBlocks := d.back.blk - d.front.blk + 1
+	frontSlack := d.front.blk
+	backSlack := cap(d.m) - d.back.blk - 1
+	if n <= backSlack {
+		return // Items can fit without growing the map.
+	}
+
+	neededBack := numutil.MaxInt(backSlack, n)
+	neededBlocks := frontSlack + usedBlocks + neededBack
+	newCap := numutil.MaxInt(cap(d.m)*2, neededBlocks)
+
+	start := frontSlack
 	d.m = d.makeMapWithSlack(newCap, start, usedBlocks)
 
 	d.front.blk = start
