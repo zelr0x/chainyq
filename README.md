@@ -7,24 +7,27 @@
 
 <img src="docs/images/logo.png" alt="Project Logo" width="250"/>
 
-Chainyq provides fast, ergonomic queues, lists, and iterators for Go,
-with a focus on high and predictable performance. The API
+Chainyq provides fast, ergonomic queues, lists, iterators and lazy sequences
+for Go, with a focus on high and predictable performance. The API
 offers rich functionality inspired by collections in Rust and Java,
-while prioritizing static dispatch and avoiding errors, panics, and the
-complexity that comes with them. Written in Go 1.25 with zero dependencies.
+while prioritizing memory control, static dispatch and deliberately avoiding
+errors and panics to reduce complexity and overhead.
+Written in Go 1.25 with zero dependencies.
 
-Currently available:
+
+## What's inside
+
 - `Deque[T any]` - a highly optimized cache-friendly segmented array deque:
-  - Per-side capacity tuning
-  - Configurable pooling
-  - Fast end operations, random access, and 3 types of iterators
+  - Full memory control with `Resize`, `ResizeFront`, `ResizeBack`, `EnsureFront`, `EnsureBack`, `ShrinkToFit` and optional configurable pooling
+  - Fast, *O*(1) end operations and random access
+  - 3 types of iterators tailored to the implementation
   - **Likely the fastest general-purpose deque you'll find**
 - `List[T any]` - a simple doubly-linked list
-  - Fast insertion and deletion in the middle, for cases when you need to do it frequently
-  - ~1.5x faster than container.List
-  - 3 types of iterators
+  - Fast, *O*(1) insertion and deletion anywhere, for cases when you need to do it frequently
+  - ~1.5x faster than `container.List`
+  - 3 types of iterators that can mutate the list
 - `Stack[T any]` - a slice-based stack
-  - Fast `Push`, `Pop` and `Peek`
+  - Fast, *O*(1) `Push`, `Pop` and `Peek` without redundant bounds checking
   - Top-down iterator
 - `Seq[T any]` - extremely lightweight and simple lazy sequence
   - `Filter`, `Map`, `FlatMap`, `Reduce`, `ForEach`, `ToSlice`, `ToMap`, `GroupBy`, etc.
@@ -55,75 +58,79 @@ go get github.com/zelr0x/chainyq
 
 ### Benchmarks
 
-The following benchmarks highlight common workloads for deques.
+The following benchmarks highlight common workloads for deques. This is an excerpt from
+```bash
+go test -bench=. -benchmem -count=10 > bench.txt
+benchstat bench.txt
+```
 
 | PushBack                   |  ns/op         | B/op       | allocs/op |
 |----------------------------|---------------:|-----------:|----------:|
-| chainyq.Deque              |    3.618 ±  8% |    8 ±  0% |         0 |
-| chainyq.Deque_EnsureBack   |    2.757 ±  8% |    0 ±  0% |         0 |
-| edwingeng.Deque            |    5.303 ±  2% |    8 ±  0% |         0 |
-| gammazero.Deque            |    4.268 ± 51% |   14 ± 14% |         0 |
-| gammazero.Deque_SetBaseCap |    4.132 ±  2% |   14 ±  7% |         0 |
-| chainyq.List               |   50.660 ± 13% |   24 ±  0% |         1 |
-| container.List             |   78.810 ± 11% |   55 ±  0% |         1 |
+| chainyq.Deque              |    3.329 ± 11% |    8 ±  0% |         0 |
+| chainyq.Deque_EnsureBack   |    2.505 ±  3% |    0 ±  0% |         0 |
+| edwingeng.Deque            |    4.886 ±  4% |    8 ±  0% |         0 |
+| gammazero.Deque            |    3.928 ± 33% |   14 ± 14% |         0 |
+| gammazero.Deque_SetBaseCap |    3.981 ±  9% |   14 ±  7% |         0 |
+| chainyq.List               |   44.130 ±  7% |   24 ±  0% |         1 |
+| container.List             |   67.350 ± 13% |   55 ±  0% |         1 |
 
 
 | PushFront                  | ns/op          | B/op         | allocs/op |
 |----------------------------|---------------:|-------------:|----------:|
-| chainyq.Deque              |    3.690 ±  5% |    8.0 ±  0% |         0 |
-| chainyq.Deque_EnsureFront  |    3.620 ±  3% |    8.0 ±  0% |         0 |
-| edwingeng.Deque            |    4.836 ±  3% |    8.0 ±  0% |         0 |
-| gammazero.Deque            |    5.125 ± 52% |   18.5 ± 19% |         0 |
-| chainyq.List               |   47.580 ± 12% |   24.0 ±  0% |         1 |
-| container.List             |   76.700 ±  9% |   55.0 ±  0% |         1 |
+| chainyq.Deque              |    3.585 ±  5% |    8.0 ±  0% |         0 |
+| chainyq.Deque_EnsureFront  |    2.743 ±  1% |    0.0 ±  0% |         0 |
+| edwingeng.Deque            |    4.526 ±  3% |    8.0 ±  0% |         0 |
+| gammazero.Deque            |    5.072 ± 22% |   18.0 ± 22% |         0 |
+| chainyq.List               |   46.920 ±  9% |   24.0 ±  0% |         1 |
+| container.List             |   72.550 ±  9% |   55.0 ±  0% |         1 |
 
 
 | BlockBoundaryThrash        | ns/op          | B/op       | allocs/op |
 |----------------------------|---------------:|-----------:|----------:|
-| chainyq.Deque              |    5.284 ± 11% |    0 ± 0%  |         0 |
+| chainyq.Deque              |    5.124 ±  2% |    0 ± 0%  |         0 |
 
 *This one is extremely unpleasant for segmented arrays. Notice the memory*
 
 
 | Random churn (int)         | ns/op         | B/op      | allocs/op |
 |----------------------------|-------------:|-----------:|----------:|
-| chainyq.Deque              |   10.22 ± 1% |    0 ± 0%  |         0 |
-| edwingeng.Deque            |   10.49 ± 1% |    0 ± 0%  |         0 |
-| gammazero.Deque            |   11.36 ± 2% |    0 ± 0%  |         0 |
-| chainyq.List               |   20.11 ± 1% |   11 ± 0%  |         0 |
-| container.List             |   28.47 ± 1% |   27 ± 0%  |         0 |
+| chainyq.Deque              |    9.74 ± 1% |    0 ± 0%  |         0 |
+| edwingeng.Deque            |   10.10 ± 1% |    0 ± 0%  |         0 |
+| gammazero.Deque            |   10.81 ± 2% |    0 ± 0%  |         0 |
+| chainyq.List               |   18.80 ± 0% |   11 ± 0%  |         0 |
+| container.List             |   26.59 ± 3% |   27 ± 0%  |         0 |
 
 
 | Random churn (big struct)  | ns/op         | B/op       | allocs/op |
 |----------------------------|--------------:|-----------:|----------:|
-| chainyq.Deque              |    15.66 ± 2% |    0 ± 0%  |         0 |
-| edwingeng.Deque            |    16.31 ± 2% |    0 ± 0%  |         0 |
-| gammazero.Deque            |    15.49 ± 1% |    0 ± 0%  |         0 |
+| chainyq.Deque              |    14.82 ± 0% |    0 ± 0%  |         0 |
+| edwingeng.Deque            |    15.49 ± 1% |    0 ± 0%  |         0 |
+| gammazero.Deque            |    14.72 ± 1% |    0 ± 0%  |         0 |
 
 
-| Random access (get by index) | ns/op         | B/op       | allocs/op |
-|------------------------------|--------------:|-----------:|----------:|
-| chainyq.Deque                |    10.11 ± 6% |    0 ± 8%  |         0 |
-| edwingeng.Deque              |  2948.00 ± 2% |    0 ± 8%  |         0 |
-| gammazero.Deque              |    9.799 ± 2% |    0 ± 8%  |         0 |
+| Random access (get by index) | ns/op          | B/op       | allocs/op |
+|------------------------------|---------------:|-----------:|----------:|
+| chainyq.Deque                |     8.90 ±  2% |    0 ± 8%  |         0 |
+| edwingeng.Deque              |  2761.00 ±  7% |    0 ± 8%  |         0 |
+| gammazero.Deque              |    11.22 ± 42% |    0 ± 8%  |         0 |
 
-*Ring buffer should win here, but the gain is in the noise range*
+*Ring buffer should win here, and it does sometimes. Not this time though*
 
 
 | Bursts of 100k writes/10k reads | ns/op          | B/op       | allocs/op |
 |---------------------------------|---------------:|-----------:|----------:|
-| chainyq.Deque					  |    18.96 ± 6%  |    0 ± 0%  |         0 |
-| edwingeng.Deque				  |    20.44 ± 2%  |    0 ± 0%  |         0 |
-| gammazero.Deque				  |    29.04 ± 2%  |    2 ± 0%  |         0 |
+| chainyq.Deque					  |    19.12 ± 5%  |    0 ± 0%  |         0 |
+| edwingeng.Deque				  |    20.05 ± 4%  |    0 ± 0%  |         0 |
+| gammazero.Deque				  |    29.98 ± 5%  |    2 ± 0%  |         0 |
 
 *Segmented array should win here*
 
 
 | Sliding window             | ns/op          | B/op       | allocs/op |
 |----------------------------|---------------:|-----------:|----------:|
-| chainyq.Deque              |    17.87 ± 8%  |    0 ± 0%  |         0 |
-| edwingeng.Deque            |    21.13 ± 7%  |    0 ± 0%  |         0 |
-| gammazero.Deque            |    17.54 ± 8%  |    0 ± 0%  |         0 |
+| chainyq.Deque              |    18.23 ± 7%  |    0 ± 0%  |         0 |
+| edwingeng.Deque            |    21.62 ± 6%  |    0 ± 0%  |         0 |
+| gammazero.Deque            |    17.31 ± 6%  |    0 ± 0%  |         0 |
 
 *Ring buffer should win here, but the gain is minimal*
 
@@ -136,9 +143,9 @@ there, yet `chainyq.Deque` keeps up.
 - In bursty growth scenarios, it is the clear winner.
 - It remains unaffected by workloads tailored to hurt segmented arrays,
 such as block boundary thrashing.
-- Overall, `chainyq.Deque` is not only extremely fast but also the most stable
-across runs, with the lowest variance and consistent 0 allocs/op and ~8 B/op
-memory usage.
+- Overall, `chainyq.Deque` is not only extremely fast but also stable
+across runs, with very low variance and consistent 0 allocs/op and ~8 B/op
+memory usage (0 B/op with ensure).
 
 Full results are available in bench.txt, the code for benchmarks is at `/deque/deque_benchmark_test.go`.
 
@@ -147,6 +154,7 @@ Full results are available in bench.txt, the code for benchmarks is at `/deque/d
 import (
 	"github.com/zelr0x/chainyq/deque"
 )
+
 func main() {
 	d := deque.FromSlice([]int{2, 4, 8, 16})
 	v, _ := d.PopBack()  // 16, true
@@ -155,7 +163,7 @@ func main() {
 		fmt.Printf("popped from front: %v\n", v)
 	}
 	d.ToSlice() // [2 4 8]
-	d.Iter().ForEachPtr(func(x *int) bool {
+	d.Iter().Skip(1).ForEachPtr(func(x *int) bool {
 		*x *= 10
 		return true // Can stop early here
 	})
@@ -241,7 +249,8 @@ the opposite direction with `Rev` and to `BidiIter` with `Bidi`.
 Methods on `BidiIter` have the same traversal direction as `Iter`, except for special
 reverse-direction methods that exist only on `BidiIter`.
 
-`list.List` iterators also have methods for item insertion and removal.
+`list.List` iterators also have methods for item insertion and removal
+like `InsertBefore`, `InsertAfter`, `Remove` and `DrainWhile`.
 
 ```go
 import (
@@ -340,6 +349,7 @@ func main() {
 	m  // {"a": ["apple", "apricot"], "b": "banana"}
 }
 ```
+
 
 ### Seq API
 
