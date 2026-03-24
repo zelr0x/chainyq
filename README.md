@@ -27,7 +27,7 @@ Written in Go 1.25 with zero dependencies.
   - ~1.5x faster than `container.List`
   - 3 types of iterators that can mutate the list
 - `Stack[T any]` - a slice-based stack
-  - Fast, *O*(1) `Push`, `Pop` and `Peek` without redundant bounds checking
+  - Fast, *O*(1) `Push`, `Pop` and `Peek`
   - Top-down iterator
 - `Seq[T any]` - extremely lightweight and simple lazy sequence
   - `Filter`, `Map`, `FlatMap`, `Reduce`, `ForEach`, `ToSlice`, `ToMap`, `GroupBy`, etc.

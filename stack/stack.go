@@ -19,9 +19,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"unsafe"
 
-	"github.com/zelr0x/chainyq/internal/unsafeutil"
 	"github.com/zelr0x/chainyq/seq"
 )
 
@@ -178,9 +176,8 @@ func (s *Stack[T]) Pop() (T, bool) {
 		var zero T
 		return zero, false
 	}
-	base := unsafe.SliceData(b) // #nosec G103
-	v := *unsafeutil.At(base, n-1)
-	s.b = unsafe.Slice(base, n-1) // #nosec G103
+	v := b[n-1]
+	s.b = b[:n-1]
 	return v, true
 }
 
@@ -198,7 +195,7 @@ func (s *Stack[T]) Peek() (T, bool) {
 		var zero T
 		return zero, false
 	}
-	return *unsafeutil.At(unsafe.SliceData(b), n-1), true // #nosec G103
+	return b[n-1], true
 }
 
 // Back is an alias for [Peek] added to conform to [chainyq.Stack].
@@ -212,7 +209,7 @@ func (s *Stack[T]) PeekPtr() (*T, bool) {
 	if n == 0 {
 		return nil, false
 	}
-	return unsafeutil.At(unsafe.SliceData(b), n-1), true // #nosec G103
+	return &b[n-1], true
 }
 
 // BackPtr is an alias for [PeekPtr] added to conform to [chainyq.Stack].
