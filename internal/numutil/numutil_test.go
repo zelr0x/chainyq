@@ -41,42 +41,6 @@ func TestClampInt(t *testing.T) {
 	}
 }
 
-func TestMaxInt(t *testing.T) {
-	tests := []struct {
-		name string
-		a, b int
-		want int
-	}{
-		{"a greater", 5, 3, 5},
-		{"b greater", 2, 7, 7},
-		{"equal", 4, 4, 4},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := MaxInt(tt.a, tt.b)
-			AssertEq(t, tt.want, got)
-		})
-	}
-}
-
-func TestMinInt(t *testing.T) {
-	tests := []struct {
-		name string
-		a, b int
-		want int
-	}{
-		{"a smaller", 3, 5, 3},
-		{"b smaller", 7, 2, 2},
-		{"equal", 4, 4, 4},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := MinInt(tt.a, tt.b)
-			AssertEq(t, tt.want, got)
-		})
-	}
-}
-
 func TestRoundNextPow2(t *testing.T) {
 	AssertEq(t, 1, RoundNextPow2(0), "must be 1 for 0")
 

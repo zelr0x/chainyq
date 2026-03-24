@@ -28,20 +28,6 @@ func ClampInt(x, min, max int) int {
 	return x
 }
 
-func MaxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func MinInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func RoundNextPow2(x uint) uint {
 	if x == 0 {
 		return 1

@@ -21,7 +21,6 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/zelr0x/chainyq/internal/numutil"
 	"github.com/zelr0x/chainyq/internal/unsafeutil"
 	"github.com/zelr0x/chainyq/seq"
 )
@@ -53,7 +52,7 @@ func NewValue[T any](initCap int) Stack[T] {
 
 // FromSlice creates a Stack by copying all the items from a given slice.
 func FromSlice[T any](vals []T) *Stack[T] {
-	b := make([]T, numutil.MaxInt(len(vals), 16))
+	b := make([]T, max(len(vals), 16))
 	copy(b, vals)
 	return Wrap(b)
 }

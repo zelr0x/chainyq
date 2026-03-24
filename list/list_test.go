@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/zelr0x/chainyq/internal/numutil"
 	. "github.com/zelr0x/chainyq/internal/testutil"
 )
 
@@ -501,7 +500,7 @@ func TestSliceAndPtrSlice(t *testing.T) {
 			start := tt.start
 			var want []int
 			if start >= 0 && start < len(slice) && tt.end > start {
-				want = slice[start:numutil.MinInt(tt.end, len(slice))]
+				want = slice[start:min(tt.end, len(slice))]
 			} else {
 				want = []int{}
 			}

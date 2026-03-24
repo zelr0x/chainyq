@@ -183,10 +183,10 @@ func NewValue[T any](cfg DequeCfg) Deque[T] {
 		frontCapItems := numutil.ClampInt(cfg.FrontCap, 0, maxSideCapItems)
 		backCapItems := numutil.ClampInt(cfg.BackCap, 0, maxSideCapItems)
 		if frontCapItems != 0 {
-			frontBlocks = numutil.MaxInt(1, blocksForCapCeil(blockSize, frontCapItems))
+			frontBlocks = max(1, blocksForCapCeil(blockSize, frontCapItems))
 		}
 		if backCapItems != 0 {
-			backBlocks = numutil.MaxInt(1, blocksForCapCeil(blockSize, backCapItems))
+			backBlocks = max(1, blocksForCapCeil(blockSize, backCapItems))
 		}
 	}
 
@@ -202,7 +202,7 @@ func NewValue[T any](cfg DequeCfg) Deque[T] {
 			pooled:    cfg.Pooled,
 		}),
 		initCfg: initCfg{
-			totalBlocks: numutil.MaxInt(2, frontBlocks+backBlocks),
+			totalBlocks: max(2, frontBlocks+backBlocks),
 			frontBlock:  frontBlocks,
 			backBlock:   frontBlocks, // not a typo
 		},
@@ -231,7 +231,7 @@ func SuggestBlockSize[T any]() int {
 
 	blockSize := (blockBytes + sz - 1) / sz
 	blockSize = int(numutil.RoundNextPow2(uint(blockSize))) // #nosec G115
-	blockSize = numutil.MaxInt(blockSize, minBlockSize)
+	blockSize = max(blockSize, minBlockSize)
 
 	bytesUsed := blockSize * sz
 	rem := bytesUsed % cacheLine
@@ -962,10 +962,10 @@ func (d *Deque[T]) reserveBlocks(frontBlocks, backBlocks int) {
 		return // Items can fit without growing the map.
 	}
 
-	neededFront := numutil.MaxInt(frontSlack, frontBlocks)
-	neededBack := numutil.MaxInt(backSlack, backBlocks)
+	neededFront := max(frontSlack, frontBlocks)
+	neededBack := max(backSlack, backBlocks)
 	neededBlocks := neededFront + usedBlocks + neededBack
-	newCap := numutil.MaxInt(cap(d.m)*2, neededBlocks)
+	newCap := max(cap(d.m)*2, neededBlocks)
 
 	start := neededFront
 	if frontBlocks > backBlocks {
@@ -987,9 +987,9 @@ func (d *Deque[T]) reserveFrontBlocks(n int) {
 		return // Items can fit without growing the map.
 	}
 
-	neededFront := numutil.MaxInt(frontSlack, n)
+	neededFront := max(frontSlack, n)
 	neededBlocks := neededFront + usedBlocks + backSlack
-	newCap := numutil.MaxInt(cap(d.m)*2, neededBlocks)
+	newCap := max(cap(d.m)*2, neededBlocks)
 
 	start := newCap - usedBlocks - backSlack
 	d.m = d.makeMapWithSlack(newCap, start, usedBlocks)
@@ -1008,9 +1008,9 @@ func (d *Deque[T]) reserveBackBlocks(n int) {
 		return // Items can fit without growing the map.
 	}
 
-	neededBack := numutil.MaxInt(backSlack, n)
+	neededBack := max(backSlack, n)
 	neededBlocks := frontSlack + usedBlocks + neededBack
-	newCap := numutil.MaxInt(cap(d.m)*2, neededBlocks)
+	newCap := max(cap(d.m)*2, neededBlocks)
 
 	start := frontSlack
 	d.m = d.makeMapWithSlack(newCap, start, usedBlocks)
@@ -1291,7 +1291,7 @@ func (it *RevIter[T]) TakeSlice(n int) []T {
 	if !it.HasNext() || n < 1 {
 		return []T{}
 	}
-	res := make([]T, 0, numutil.MinInt(it.b.d.len, n))
+	res := make([]T, 0, min(it.b.d.len, n))
 	i := 0
 	for v, ok := it.Peek(); ok && i < n; v, ok = it.Peek() {
 		res = append(res, v)
@@ -1310,7 +1310,7 @@ func (it *RevIter[T]) TakePtrSlice(n int) []*T {
 	if !it.HasNext() || n < 1 {
 		return []*T{}
 	}
-	res := make([]*T, 0, numutil.MinInt(it.b.d.len, n))
+	res := make([]*T, 0, min(it.b.d.len, n))
 	i := 0
 	for v, ok := it.PeekPtr(); ok && i < n; v, ok = it.PeekPtr() {
 		res = append(res, v)
@@ -1330,7 +1330,7 @@ func (it *RevIter[T]) TakeWhile(pred func(T) bool) []T {
 	if !it.HasNext() {
 		return []T{}
 	}
-	res := make([]T, 0, numutil.MinInt(it.b.d.len, takeWhileInitCap))
+	res := make([]T, 0, min(it.b.d.len, takeWhileInitCap))
 	for v, ok := it.Peek(); ok && pred(v); v, ok = it.Peek() {
 		res = append(res, v)
 		_, _ = it.Next()
@@ -1348,7 +1348,7 @@ func (it *RevIter[T]) TakeWhilePtr(pred func(*T) bool) []*T {
 	if !it.HasNext() {
 		return []*T{}
 	}
-	res := make([]*T, 0, numutil.MinInt(it.b.d.len, takeWhileInitCap))
+	res := make([]*T, 0, min(it.b.d.len, takeWhileInitCap))
 	for v, ok := it.PeekPtr(); ok && pred(v); v, ok = it.PeekPtr() {
 		res = append(res, v)
 		_, _ = it.Next()
@@ -1578,7 +1578,7 @@ func (it *BidiIter[T]) TakeSlice(n int) []T {
 	if n < 1 || !it.HasNext() {
 		return []T{}
 	}
-	res := make([]T, 0, numutil.MinInt(it.d.len, n))
+	res := make([]T, 0, min(it.d.len, n))
 	for range n {
 		v, ok := it.Next()
 		if !ok {
@@ -1598,7 +1598,7 @@ func (it *BidiIter[T]) TakePtrSlice(n int) []*T {
 	if n < 1 || !it.HasNext() {
 		return []*T{}
 	}
-	res := make([]*T, 0, numutil.MinInt(it.d.len, n))
+	res := make([]*T, 0, min(it.d.len, n))
 	for range n {
 		v, ok := it.NextPtr()
 		if !ok {
@@ -1619,7 +1619,7 @@ func (it *BidiIter[T]) TakeWhile(pred func(T) bool) []T {
 	if !it.HasNext() {
 		return []T{}
 	}
-	res := make([]T, 0, numutil.MinInt(it.d.len, takeWhileInitCap))
+	res := make([]T, 0, min(it.d.len, takeWhileInitCap))
 	for v, ok := it.Peek(); ok && pred(v); v, ok = it.Peek() {
 		res = append(res, v)
 		it.advance()
@@ -1637,7 +1637,7 @@ func (it *BidiIter[T]) TakeWhilePtr(pred func(*T) bool) []*T {
 	if !it.HasNext() {
 		return []*T{}
 	}
-	res := make([]*T, 0, numutil.MinInt(it.d.len, takeWhileInitCap))
+	res := make([]*T, 0, min(it.d.len, takeWhileInitCap))
 	for v, ok := it.PeekPtr(); ok && pred(v); v, ok = it.PeekPtr() {
 		res = append(res, v)
 		it.advance()
