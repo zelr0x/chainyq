@@ -147,8 +147,6 @@ such as block boundary thrashing.
 across runs, with very low variance and consistent 0 allocs/op and ~8 B/op
 memory usage (0 B/op with ensure).
 
-Full results are available in bench.txt, the code for benchmarks is at `/deque/deque_benchmark_test.go`.
-
 
 ```go
 import (
