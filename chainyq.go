@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package chainyq provides generic data structures and iterator utilities.
+// Package chainyq defines interfaces implemented by different types
+// in the library.
 //
-// The core types are concrete and optimized for speed. Interfaces
-// such as [Deque] or [Iterator] are defined for convenience.
 // Note that using interfaces introduces dynamic dispatch, which can be
 // noticeably slower in some cases, even when used as generic type parameter
 // constraint. Prefer concrete types for performance-sensitive cases.
+//
+// The core implementations live in subpackages:
+//   - [deque] — segmented array deque
+//   - [list] — doubly‑linked list
+//   - [stack] — slice‑based stack
+//   - [seq] — lazy sequences
+//   - [deque/syncdeque] — synchronized deque wrapper
 package chainyq
 
 import "github.com/zelr0x/chainyq/seq"
@@ -78,16 +84,9 @@ type Stack[T any] interface {
 type Deque[T any] interface {
 	BidiCollection[T]
 	RandomAccess[T]
-
-	PushBack(T)
-	PopBack() (T, bool)
-	Back() (T, bool)
-	BackPtr() (*T, bool)
-
+	Stack[T]
+	Queue[T]
 	PushFront(T)
-	PopFront() (T, bool)
-	Front() (T, bool)
-	FrontPtr() (*T, bool)
 }
 
 type Nexter[T any] interface {
