@@ -18,12 +18,12 @@ import (
 	"math/bits"
 )
 
-func ClampInt(x, min, max int) int {
-	if x < min {
-		return min
+func ClampInt(x, minVal, maxVal int) int {
+	if x < minVal {
+		return minVal
 	}
-	if x > max {
-		return max
+	if x > maxVal {
+		return maxVal
 	}
 	return x
 }

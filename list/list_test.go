@@ -818,11 +818,7 @@ func TestIterForEachAndChannelsEmpty(t *testing.T) {
 	l := New[int]()
 	tests := []struct {
 		name string
-		it   interface {
-			ForEach(func(int) bool)
-			ToChan(cap int) <-chan int
-			ToPtrChan(cap int) <-chan *int
-		}
+		it   ListIterator[int]
 	}{
 		{"Iter", l.Iter()},
 		{"BidiIter", l.BidiIter()},

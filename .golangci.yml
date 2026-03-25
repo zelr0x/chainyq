@@ -24,6 +24,7 @@ linters:
     - exhaustive
     - gosec
     - govet
+    - predeclared
     - importas
     - ineffassign
     - misspell

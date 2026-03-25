@@ -31,10 +31,9 @@ var defCfg DequeCfg = DequeCfg{
 }
 
 var defCfgPooled = func() DequeCfg {
-	copy := defCfg
-	copy.Pooled = true
-	// copy.PoolPrealloc = 16
-	return copy
+	dc := defCfg
+	dc.Pooled = true
+	return dc
 }()
 
 const defCfgInitCap int = 4 * 4

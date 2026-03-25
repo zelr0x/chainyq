@@ -86,6 +86,6 @@ func BenchmarkBurstyWithEnsure(b *testing.B) {
 	})
 
 	elapsed := b.Elapsed().Nanoseconds()
-	real := float64(elapsed) / float64(b.N*opsPerIter)
-	b.ReportMetric(real, "ns/deque-op")
+	nsPerDqOp := float64(elapsed) / float64(b.N*opsPerIter)
+	b.ReportMetric(nsPerDqOp, "ns/deque-op")
 }
