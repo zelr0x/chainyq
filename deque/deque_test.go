@@ -189,6 +189,32 @@ func TestNewValue(t *testing.T) {
 	}
 }
 
+func TestNewAndNewPooled(t *testing.T) {
+	suggestedBlockSize := SuggestBlockSize[int]()
+	d := New[int]()
+	AssertEq(t, suggestedBlockSize, d.blockSize)
+	AssertEq(t, d.blockSize-1, d.blockMask)
+	AssertTrue(t, d.blockShift > 1)
+	AssertEq(t, 2*defSideCapBlocks, d.initCfg.totalBlocks)
+	AssertEq(t, 0, d.Len())
+	AssertTrue(t, d.IsEmpty())
+	AssertNotNil(t, d.m)
+	AssertFalse(t, d.a.pooled)
+}
+
+func TestNewPooled(t *testing.T) {
+	suggestedBlockSize := SuggestBlockSize[int]()
+	d := NewPooled[int]()
+	AssertEq(t, suggestedBlockSize, d.blockSize)
+	AssertEq(t, d.blockSize-1, d.blockMask)
+	AssertTrue(t, d.blockShift > 1)
+	AssertEq(t, 2*defSideCapBlocks, d.initCfg.totalBlocks)
+	AssertEq(t, 0, d.Len())
+	AssertTrue(t, d.IsEmpty())
+	AssertNotNil(t, d.m)
+	AssertTrue(t, d.a.pooled)
+}
+
 func TestLenFunc(t *testing.T) {
 	var d *Deque[int]
 	AssertEq(t, 0, Len(d))
@@ -437,6 +463,9 @@ func TestBackAfterBlockFilled(t *testing.T) {
 	AssertEq(t, 0, d.back.off)
 	v, ok := d.Back()
 	AssertEqOk(t, d.blockSize-1, v, ok)
+	vPtr, ok := d.BackPtr()
+	AssertNotNil(t, vPtr)
+	AssertEqOk(t, d.blockSize-1, *vPtr, ok)
 }
 
 func TestPushFrontAndPushBack(t *testing.T) {
@@ -662,6 +691,12 @@ func TestGetSmall(t *testing.T) {
 			d := FromSlice(tt.values)
 			gotVal, gotOK := d.Get(tt.idx)
 			AssertCommaOk(t, tt.wantVal, tt.wantOK, gotVal, gotOK, fmt.Sprintf("Get(%d)", tt.idx))
+			gotPtr, gotPtrOK := d.GetPtr(tt.idx)
+			if !tt.wantOK {
+				AssertZeroFalse(t, gotPtr, gotPtrOK)
+			} else {
+				AssertEqOk(t, tt.wantVal, *gotPtr, gotPtrOK)
+			}
 		})
 	}
 }
@@ -683,6 +718,34 @@ func TestGetLarge(t *testing.T) {
 			AssertEqOk(t, want, got, ok)
 		})
 	}
+}
+
+func TestGetPtrMutation(t *testing.T) {
+	d := FromSlice([]int{1, 2, 3})
+	ptr, ok := d.GetPtr(1)
+	AssertTrue(t, ok)
+	*ptr = 99
+	val, ok := d.Get(1)
+	AssertEqOk(t, 99, val, ok)
+}
+
+func TestSet(t *testing.T) {
+	d := FromSlice(SliceFromRangeExcl(t, 0, 100))
+	i := 50
+	v, ok := d.Get(i)
+	AssertEqOk(t, i, v, ok)
+
+	v, ok = d.Set(i, -i)
+	AssertEqOk(t, i, v, ok)
+
+	v, ok = d.Get(i)
+	AssertEqOk(t, -i, v, ok)
+
+	_, ok = d.Set(-1, 5)
+	AssertFalse(t, ok)
+
+	_, ok = d.Set(d.Len(), 5)
+	AssertFalse(t, ok)
 }
 
 func TestReserveNOOP(t *testing.T) {
@@ -740,10 +803,16 @@ func TestReserveNOOP(t *testing.T) {
 
 func TestReserveFront(t *testing.T) {
 	d := New[int]()
+
 	blockSize := d.blockSize
 
 	initMap := d.m
 	initialCap := cap(d.m)
+
+	d.ReserveFront(-1)
+	AssertTrue(t, d.IsEmpty())
+	AssertEq(t, initialCap, cap(d.m))
+
 	itemsToFill := itemsToFillFront(t, d)
 	for i := range itemsToFill {
 		d.PushFront(i)
@@ -775,6 +844,11 @@ func TestReserveBack(t *testing.T) {
 
 	initMap := d.m
 	initialCap := cap(d.m)
+
+	d.ReserveBack(-1)
+	AssertTrue(t, d.IsEmpty())
+	AssertEq(t, initialCap, cap(d.m))
+
 	itemsToFill := itemsToFillBack(t, d)
 	for i := range itemsToFill {
 		d.PushBack(i)
@@ -939,15 +1013,6 @@ func TestEnsureFrontZeroAllocGuarantee(t *testing.T) {
 	}
 }
 
-func TestGetPtrMutation(t *testing.T) {
-	d := FromSlice([]int{1, 2, 3})
-	ptr, ok := d.GetPtr(1)
-	AssertTrue(t, ok)
-	*ptr = 99
-	val, ok := d.Get(1)
-	AssertEqOk(t, 99, val, ok)
-}
-
 func TestPushBackGrowthStability(t *testing.T) {
 	d := WithCfg[int](defCfg)
 	stages := []struct {
@@ -1068,6 +1133,25 @@ func TestDequeBlockBoundary(t *testing.T) {
 		v, _ := d.PopFront()
 		AssertEq(t, i, v)
 	}
+}
+
+func TestPreallocPool(t *testing.T) {
+	d := New[int]()
+	ok := d.PreallocPool(1)
+	AssertFalse(t, ok)
+
+	d = NewPooled[int]()
+	ok = d.PreallocPool(1)
+	AssertTrue(t, ok)
+	// Impl-dependent test, but ok for now.
+	AssertEq(t, 1, d.a.pool.Len())
+
+	ok = d.PreallocPool(d.blockSize + 1)
+	AssertTrue(t, ok)
+	// Impl-dependent test, but ok for now.
+	// Each prealloc creates at least one block, so after prealloc(1)
+	// and prealloc(d.blockSize+1) are requested, a total of 3 blocks are preallocated.
+	AssertEq(t, 3, d.a.pool.Len())
 }
 
 func TestShrinkToFit(t *testing.T) {
@@ -1539,46 +1623,144 @@ func TestIterTakeAndSkip(t *testing.T) {
 	}
 }
 
-// ----- Helpers -----
-func AssertDequeInvariant[T any](t *testing.T, d *Deque[T]) {
-	t.Helper()
+func TestBidiIterForEach(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 100)
+	d := FromSlice(slice)
+	got := make([]int, 0, len(slice)/2)
+	d.BidiIter().ForEach(func(x int) bool {
+		got = append(got, x)
+		return x < 50
+	})
+	// 50 is included because append is before check
+	want := slice[:51]
+	AssertSliceEq(t, want, got)
+}
 
-	dLen := d.len
-	mapLen := len(d.m)
+func TestIterForEach(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 100)
+	d := FromSlice(slice)
+	got := make([]int, 0, len(slice)/2)
+	d.Iter().ForEach(func(x int) bool {
+		got = append(got, x)
+		return x < 50
+	})
+	// 50 is included because append is before check
+	want := slice[:51]
+	AssertSliceEq(t, want, got)
+}
 
-	AssertTrue(t, dLen >= 0, "deque len must be nonneg")
-	AssertFalse(t, dLen != 0 && mapLen == 0, fmt.Sprintf(
-		"deque has zero blocks but non-zero length: %d", dLen))
+func TestRevIterForEach(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 100)
+	d := FromSlice(slice)
+	got := make([]int, 0, len(slice)/2)
+	d.RevIter().ForEach(func(x int) bool {
+		got = append(got, x)
+		return x > 50
+	})
+	// 50 is included because append is before check
+	want := ReversedSlice(slice[50:])
+	AssertSliceEq(t, want, got)
+}
 
-	front := d.front
-	back := d.back
-	blockSize := d.blockSize
+func TestBidiForEachPtrMutation(t *testing.T) {
+	slice := []int{1, 2, 3, 4, 5}
+	d := FromSlice(slice)
+	i := 10
+	d.BidiIter().ForEachPtr(func(x *int) bool {
+		v := *x
+		*x *= i
+		i *= 10
+		return v < 3
+	})
+	want := []int{10, 200, 3000, 4, 5}
+	AssertSliceEq(t, want, d.ToSlice())
+}
 
-	if d.len == 0 {
-		AssertEq(t, front.blk, back.blk)
-		AssertEq(t, front.off, back.off)
+func TestRevIterForEachPtrMutation(t *testing.T) {
+	slice := []int{1, 2, 3, 4, 5}
+	d := FromSlice(slice)
+	i := 10
+	d.RevIter().ForEachPtr(func(x *int) bool {
+		v := *x
+		*x *= i
+		i *= 10
+		return v > 3
+	})
+	want := []int{1, 2, 3000, 400, 50}
+	AssertSliceEq(t, want, d.ToSlice())
+}
+
+func TestRevIterToChan(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 100)
+	d := FromSlice(slice)
+	ch := d.RevIter().ToChan(0)
+	got := make([]int, 0, len(slice))
+	for i := range ch {
+		got = append(got, i)
 	}
+	want := ReversedSlice(slice)
+	AssertSliceEq(t, want, got)
+}
 
-	AssertTrue(t, front.off >= 0, "front offset must be nonneg")
-	AssertTrue(t, front.off < blockSize, "front offset must fit block size")
-
-	AssertTrue(t, back.off >= 0, "back offset must be nonneg")
-	AssertTrue(t, back.off < blockSize, "back offset must fit block size")
-
-	AssertTrue(t, front.blk >= 0, "front blk must be nonneg")
-	AssertTrue(t, back.blk >= 0, "back blk must be nonneg")
-
-	AssertTrue(t, front.blk < mapLen, "front blk must fit map len")
-	AssertTrue(t, back.blk < mapLen, "back blk must fit map len")
-
-	AssertTrue(t, front.blk <= back.blk, "front blk <= back blk")
-	AssertFalse(t, front.blk == back.blk && front.off > back.off,
-		fmt.Sprintf("front offset > back offset within same block: front=%v back=%v",
-			front, back))
-
-	for i := front.blk; i <= back.blk && i < len(d.m); i++ {
-		AssertNotNil(t, d.m[i], fmt.Sprintf("block %d is nil but should exist", i))
+func TestRevIterToPtrChan(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 100)
+	d := FromSlice(slice)
+	ch := d.RevIter().ToPtrChan(0)
+	got := make([]*int, 0, len(slice))
+	for i := range ch {
+		got = append(got, i)
 	}
+	want := ReversedSlice(slice)
+	AssertPtrSliceEq(t, want, got)
+}
+
+func TestRevIterTakeWhile(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 100)
+	d := FromSlice(slice)
+	got := d.RevIter().TakeWhile(func(x int) bool {
+		return x >= 50
+	})
+	want := ReversedSlice(slice[50:])
+	AssertSliceEq(t, want, got)
+}
+
+func TestRevIterTakeWhilePtr(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 100)
+	d := FromSlice(slice)
+	got := d.RevIter().TakeWhilePtr(func(x *int) bool {
+		return *x >= 50
+	})
+	want := ReversedSlice(slice[50:])
+	AssertPtrSliceEq(t, want, got)
+}
+
+// Covers if off < 0 { ... branch
+func TestBidiPeekBackAndPeekBackPtrAfterBlockFilled(t *testing.T) {
+	d := New[int]()
+	for i := range d.blockSize {
+		d.PushBack(i)
+	}
+	it := d.BidiIter().ResetBack()
+	AssertEq(t, 0, it.cur.off, "BidiIter ResetBack after pushing exactly one block sanity check")
+	v, ok := it.PeekBack()
+	AssertEqOk(t, d.blockSize-1, v, ok)
+	vPtr, ok := it.PeekBackPtr()
+	AssertNotNil(t, vPtr)
+	AssertEqOk(t, d.blockSize-1, *vPtr, ok)
+}
+
+// covers if it.cur.off < 0 { ... branch
+func TestBidiStepBackAfterBlockFilled(t *testing.T) {
+	d := New[int]()
+	for i := range d.blockSize {
+		d.PushBack(i)
+	}
+	it := d.BidiIter().ResetBack()
+	AssertEq(t, 0, it.cur.off, "BidiIter ResetBack after pushing exactly one block sanity check")
+	before := it.cur
+	it.stepBack()
+	AssertEq(t, before.blk-1, it.cur.blk)
+	AssertEq(t, d.blockSize-1, it.cur.off)
 }
 
 func TestDequeExample1(t *testing.T) {
@@ -1628,6 +1810,47 @@ func TestItemsToFill(t *testing.T) {
 }
 
 // ----- Helpers -----
+
+func AssertDequeInvariant[T any](t *testing.T, d *Deque[T]) {
+	t.Helper()
+
+	dLen := d.len
+	mapLen := len(d.m)
+
+	AssertTrue(t, dLen >= 0, "deque len must be nonneg")
+	AssertFalse(t, dLen != 0 && mapLen == 0, fmt.Sprintf(
+		"deque has zero blocks but non-zero length: %d", dLen))
+
+	front := d.front
+	back := d.back
+	blockSize := d.blockSize
+
+	if d.len == 0 {
+		AssertEq(t, front.blk, back.blk)
+		AssertEq(t, front.off, back.off)
+	}
+
+	AssertTrue(t, front.off >= 0, "front offset must be nonneg")
+	AssertTrue(t, front.off < blockSize, "front offset must fit block size")
+
+	AssertTrue(t, back.off >= 0, "back offset must be nonneg")
+	AssertTrue(t, back.off < blockSize, "back offset must fit block size")
+
+	AssertTrue(t, front.blk >= 0, "front blk must be nonneg")
+	AssertTrue(t, back.blk >= 0, "back blk must be nonneg")
+
+	AssertTrue(t, front.blk < mapLen, "front blk must fit map len")
+	AssertTrue(t, back.blk < mapLen, "back blk must fit map len")
+
+	AssertTrue(t, front.blk <= back.blk, "front blk <= back blk")
+	AssertFalse(t, front.blk == back.blk && front.off > back.off,
+		fmt.Sprintf("front offset > back offset within same block: front=%v back=%v",
+			front, back))
+
+	for i := front.blk; i <= back.blk && i < len(d.m); i++ {
+		AssertNotNil(t, d.m[i], fmt.Sprintf("block %d is nil but should exist", i))
+	}
+}
 
 // fillDequeMapFront fills deque front with just enough items in order for
 // the next PusFront to trigger map growth.
