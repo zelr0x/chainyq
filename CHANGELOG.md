@@ -2,6 +2,9 @@
 
 ## [0.2.3] - 2026-03-25
 
+### Added
+- `Deque.Clone`
+
 ### Fixed
 - Off-by-one error in `Deque.BackPtr`
 
