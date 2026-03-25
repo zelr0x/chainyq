@@ -189,6 +189,47 @@ func TestNewValue(t *testing.T) {
 	}
 }
 
+func TestLenFunc(t *testing.T) {
+	var d *Deque[int]
+	AssertEq(t, 0, Len(d))
+	d = New[int]()
+	AssertEq(t, 0, Len(d))
+	d.PushBack(1)
+	AssertEq(t, 1, Len(d))
+	d.PopFront()
+	AssertEq(t, 0, Len(d))
+}
+
+func TestClone(t *testing.T) {
+	tests := []struct {
+		name  string
+		deque *Deque[int]
+	}{
+		{"len 0", New[int]()},
+		{"len 1", FromSlice(SliceFromRangeExcl(t, 42, 43))},
+		{"len 8", FromSlice(SliceFromRangeIncl(t, 1, 8))},
+		{"len 100000", FromSlice(SliceFromRangeIncl(t, 1, 100000))},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := tt.deque
+			dClone := d.Clone()
+			AssertEq(t, len(d.m), len(dClone.m))
+			for i, block := range d.m {
+				blockClone := dClone.m[i]
+				if block == nil {
+					AssertNil(t, blockClone)
+					continue
+				}
+				AssertEq(t, len(block), len(blockClone))
+				AssertEq(t, cap(block), cap(blockClone))
+				AssertSliceEq(t, block, blockClone)
+				AssertNotSameSlice(t, block, blockClone)
+			}
+		})
+	}
+}
+
 func TestString(t *testing.T) {
 	var d *Deque[int]
 	AssertEq(t, "nil", d.String())
@@ -203,7 +244,7 @@ func TestString(t *testing.T) {
 
 func TestGoString(t *testing.T) {
 	var d *Deque[int]
-	AssertEq(t, "nil", d.String())
+	AssertEq(t, "nil", fmt.Sprintf("%#v", d))
 	d = New[int]()
 	AssertEq(t, "Deque[int]{}", fmt.Sprintf("%#v", d))
 	d.PushBack(1)
@@ -258,6 +299,24 @@ func TestEqualsAfterGrowing(t *testing.T) {
 	}
 }
 
+func TestLen(t *testing.T) {
+	d := New[int]()
+	AssertEq(t, 0, d.Len())
+	d.PushBack(1)
+	AssertEq(t, 1, d.Len())
+	d.PopFront()
+	AssertEq(t, 0, d.Len())
+}
+
+func TestIsEmpty(t *testing.T) {
+	d := New[int]()
+	AssertTrue(t, d.IsEmpty())
+	d.PushBack(1)
+	AssertFalse(t, d.IsEmpty())
+	d.PopFront()
+	AssertTrue(t, d.IsEmpty())
+}
+
 func TestEmptyOperations(t *testing.T) {
 	d := WithCfg[int](defCfg)
 
@@ -272,11 +331,112 @@ func TestEmptyOperations(t *testing.T) {
 	val, ok = d.Front()
 	AssertZeroFalse(t, val, ok, "Front on empty")
 
+	valPtr, ok := d.FrontPtr()
+	AssertZeroFalse(t, valPtr, ok, "FrontPtr on empty")
+
 	val, ok = d.Back()
 	AssertZeroFalse(t, val, ok, "Back on empty")
 
+	valPtr, ok = d.BackPtr()
+	AssertZeroFalse(t, valPtr, ok, "BackPtr on empty")
+
 	val, ok = d.Get(0)
 	AssertZeroFalse(t, val, ok, "Get(0) on empty")
+}
+
+func TestFrontAndFrontPtr(t *testing.T) {
+	tests := []struct {
+		name    string
+		deque   *Deque[int]
+		wantVal int
+		wantOk  bool
+	}{
+		{"len 0", New[int](), 0, false},
+		{"len 1", FromSlice(SliceFromRangeExcl(t, 42, 43)), 42, true},
+		{"len 8", FromSlice(SliceFromRangeIncl(t, 1, 8)), 1, true},
+		{"len 100000", FromSlice(SliceFromRangeIncl(t, 1, 100000)), 1, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := tt.deque
+			want, wantOk := tt.wantVal, tt.wantOk
+			got, ok := d.Front()
+			gotPtr, okPtr := d.FrontPtr()
+			if wantOk {
+				AssertEqOk(t, want, got, ok)
+				AssertTrue(t, okPtr)
+				AssertNotNil(t, gotPtr)
+				AssertEq(t, want, *gotPtr)
+			} else {
+				AssertZeroFalse(t, got, ok)
+				AssertNil(t, gotPtr)
+				AssertFalse(t, okPtr)
+			}
+		})
+	}
+}
+
+func TestBackAndBackPtr(t *testing.T) {
+	tests := []struct {
+		name    string
+		deque   *Deque[int]
+		wantVal int
+		wantOk  bool
+	}{
+		{"len 0", New[int](), 0, false},
+		{"len 1", FromSlice(SliceFromRangeExcl(t, 42, 43)), 42, true},
+		{"len 8", FromSlice(SliceFromRangeIncl(t, 1, 8)), 8, true},
+		{"len 100000", FromSlice(SliceFromRangeIncl(t, 1, 100000)), 100000, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := tt.deque
+			want, wantOk := tt.wantVal, tt.wantOk
+			got, ok := d.Back()
+			gotPtr, okPtr := d.BackPtr()
+			if wantOk {
+				AssertEqOk(t, want, got, ok)
+				AssertTrue(t, okPtr)
+				AssertNotNil(t, gotPtr)
+				AssertEq(t, want, *gotPtr)
+			} else {
+				AssertZeroFalse(t, got, ok)
+				AssertNil(t, gotPtr)
+				AssertFalse(t, okPtr)
+			}
+		})
+	}
+}
+
+func TestFullDequeFrontAndBack(t *testing.T) {
+	d := WithCfg[int](defCfg)
+	fillDequeMap(t, d, 1)
+	d.PopFront()
+	d.PopBack()
+	want := 5
+	d.PushBack(want)
+	d.PushFront(want)
+
+	got, ok := d.Front()
+	AssertEqOk(t, want, got, ok)
+	gotPtr, ok := d.FrontPtr()
+	AssertEqOk(t, want, *gotPtr, ok)
+
+	got, ok = d.Back()
+	AssertEqOk(t, want, got, ok)
+	gotPtr, ok = d.BackPtr()
+	AssertEqOk(t, want, *gotPtr, ok)
+}
+
+// Covers if off < 0 { in Back()
+func TestBackAfterBlockFilled(t *testing.T) {
+	d := New[int]()
+	for i := range d.blockSize {
+		d.PushBack(i)
+	}
+	AssertEq(t, 0, d.back.off)
+	v, ok := d.Back()
+	AssertEqOk(t, d.blockSize-1, v, ok)
 }
 
 func TestPushFrontAndPushBack(t *testing.T) {
@@ -583,26 +743,9 @@ func TestReserveFront(t *testing.T) {
 	blockSize := d.blockSize
 
 	initMap := d.m
-
-	// determine the number of items to trigger growth
 	initialCap := cap(d.m)
-	var itemsToGrow int
-	for {
-		oldCap := cap(d.m)
-		d.PushFront(0)
-		if cap(d.m) != oldCap {
-			break
-		}
-		itemsToGrow++
-	}
-	AssertNotSameSlice(t, initMap, d.m)
-
-	// reset deque
-	d = New[int]()
-	initMap = d.m
-
-	// push exactly itemsToGrow, map should not grow
-	for i := range itemsToGrow {
+	itemsToFill := itemsToFillFront(t, d)
+	for i := range itemsToFill {
 		d.PushFront(i)
 	}
 	AssertEqual(t, initialCap, cap(d.m))
@@ -615,10 +758,10 @@ func TestReserveFront(t *testing.T) {
 		oldBlocks[i] = d.m[d.front.blk+i]
 	}
 
-	// reserve itemsToGrow + 1 and verify growth with reuse
-	d.Reserve(itemsToGrow+1, 0)
+	// reserve itemsToFill + 1 and verify growth with reuse
+	d.Reserve(itemsToFill+1, 0)
 
-	neededFrontBlocks := (itemsToGrow + 1 + blockSize - 1) / blockSize
+	neededFrontBlocks := (itemsToFill + 1 + blockSize - 1) / blockSize
 	AssertTrue(t, cap(d.m) >= neededFrontBlocks+usedBlocks)
 	AssertEq(t, usedBlocks, d.back.blk-d.front.blk+1)
 	for i := range usedBlocks {
@@ -631,26 +774,9 @@ func TestReserveBack(t *testing.T) {
 	blockSize := d.blockSize
 
 	initMap := d.m
-
-	// determine the number of items to trigger growth
 	initialCap := cap(d.m)
-	var itemsToGrow int
-	for {
-		oldCap := cap(d.m)
-		d.PushBack(0)
-		if cap(d.m) != oldCap {
-			break
-		}
-		itemsToGrow++
-	}
-	AssertNotSameSlice(t, initMap, d.m)
-
-	// reset deque
-	d = New[int]()
-	initMap = d.m
-
-	// push exactly itemsToGrow, map should not grow
-	for i := range itemsToGrow {
+	itemsToFill := itemsToFillBack(t, d)
+	for i := range itemsToFill {
 		d.PushBack(i)
 	}
 	AssertEqual(t, initialCap, cap(d.m))
@@ -663,10 +789,10 @@ func TestReserveBack(t *testing.T) {
 		oldBlocks[i] = d.m[d.front.blk+i]
 	}
 
-	// reserve itemsToGrow + 1 and verify growth with reuse
-	d.Reserve(0, itemsToGrow+1)
+	// reserve itemsToFill + 1 and verify growth with reuse
+	d.Reserve(0, itemsToFill+1)
 
-	neededBackBlocks := (itemsToGrow + 1 + blockSize - 1) / blockSize
+	neededBackBlocks := (itemsToFill + 1 + blockSize - 1) / blockSize
 	AssertTrue(t, cap(d.m) >= neededBackBlocks+usedBlocks)
 	AssertEq(t, usedBlocks, d.back.blk-d.front.blk+1)
 
@@ -679,32 +805,13 @@ func TestReserveFrontAndBack(t *testing.T) {
 	d := New[int]()
 	blockSize := d.blockSize
 
-	initMap := d.m
-
-	// determine the number of items to trigger growth
-	initialCap := cap(d.m)
-	var itemsToGrow int
-	for {
-		d.PushBack(0)
-		if cap(d.m) != initialCap {
-			break
-		}
-		itemsToGrow++
+	itemsToFillFront, itemsToFillBack := itemsToFill(t, d)
+	for range itemsToFillFront {
+		d.PushFront(1)
 	}
-	AssertNotSameSlice(t, initMap, d.m)
-
-	// reset deque
-	d = New[int]()
-	initMap = d.m
-
-	// fill at both ends (half front, half back)
-	// TODO: can be improved - it's not an API guarantee, but it will do for now
-	half := itemsToGrow / 2
-	for i := range half {
-		d.PushFront(i)
-		d.PushBack(i)
+	for range itemsToFillBack {
+		d.PushBack(2)
 	}
-	AssertSameSlice(t, initMap, d.m)
 
 	// save old blocks
 	usedBlocks := d.back.blk - d.front.blk + 1
@@ -714,8 +821,8 @@ func TestReserveFrontAndBack(t *testing.T) {
 	}
 
 	// now reserve front+back growth
-	frontItems := half + 1
-	backItems := half + 1
+	frontItems := itemsToFillFront + 1
+	backItems := itemsToFillBack + 1
 	d.Reserve(frontItems, backItems)
 
 	neededFrontBlocks := (frontItems + blockSize - 1) / blockSize
@@ -1488,4 +1595,124 @@ func TestDequeExample1(t *testing.T) {
 		return true
 	})
 	AssertSliceEq(t, []int{2, 40, 80}, d.ToSlice())
+}
+
+// ----- Helper Tests -----
+func TestItemsToFill(t *testing.T) {
+	d := New[int]()
+	initMap := d.m
+	oldCap := cap(initMap)
+	atFront, atBack := itemsToFill(t, d)
+	// -1 because when the last slot is filled, the map grows immediately.
+	AssertEq(t, oldCap*d.blockSize-1, d.Len()+atFront+atBack, "itemsToFill sanity check 1")
+	for range atFront {
+		d.PushFront(1)
+	}
+	AssertSameSlice(t, initMap, d.m)
+	d.PushFront(2)
+	AssertNotSameSlice(t, initMap, d.m)
+	initMap = d.m
+	oldCap = cap(initMap)
+	atFront, atBack = itemsToFill(t, d)
+	AssertEq(t, oldCap*d.blockSize-1, d.Len()+atFront+atBack, "itemsToFill sanity check 2")
+	for range atBack {
+		d.PushBack(1)
+	}
+	AssertSameSlice(t, initMap, d.m)
+	d.PushBack(2)
+	AssertNotSameSlice(t, initMap, d.m)
+
+	atFront, atBack = itemsToFill(t, d)
+	AssertEq(t, atFront, itemsToFillFront(t, d))
+	AssertEq(t, atBack, itemsToFillBack(t, d))
+}
+
+// ----- Helpers -----
+
+// fillDequeMapFront fills deque front with just enough items in order for
+// the next PusFront to trigger map growth.
+func fillDequeMapFront[T any](t *testing.T, d *Deque[T], fillVal ...T) {
+	var v T
+	if len(fillVal) > 0 {
+		v = fillVal[0]
+	}
+	initMap := d.m
+	n := itemsToFillFront(t, d)
+	for range n {
+		d.PushFront(v)
+	}
+	AssertSameSlice(t, d.m, initMap, "fillDequeMapFront same map sanity check")
+}
+
+// fillDequeMapBack fills deque front with just enough items in order for
+// the next PusBack to trigger map growth.
+func fillDequeMapBack[T any](t *testing.T, d *Deque[T], fillVal ...T) {
+	var v T
+	if len(fillVal) > 0 {
+		v = fillVal[0]
+	}
+	initMap := d.m
+	n := itemsToFillBack(t, d)
+	for range n {
+		d.PushBack(v)
+	}
+	AssertSameSlice(t, d.m, initMap, "fillDequeMapBack same map sanity check")
+}
+
+func fillDequeMap[T any](t *testing.T, d *Deque[T], fillVal ...T) {
+	initMap := d.m
+	fillDequeMapFront(t, d, fillVal...)
+	fillDequeMapBack(t, d, fillVal...)
+	AssertSameSlice(t, d.m, initMap, "fillDequeMap same map sanity check")
+}
+
+// itemsToFill finds the number of items to PushFront and PushBack before
+// the map grows i.e. growth is triggered exactly on the next push.
+// May be slow.
+func itemsToFill[T any](
+	t *testing.T,
+	d *Deque[T],
+) (atFront int, atBack int) {
+	t.Helper()
+	atFront = itemsToFillFront(t, d)
+	atBack = itemsToFillBack(t, d)
+	return atFront, atBack
+}
+
+func itemsToFillFront[T any](t *testing.T, d *Deque[T]) int {
+	t.Helper()
+	oldCap := cap(d.m)
+	dClone := d.Clone()
+	AssertEq(t, oldCap, cap(dClone.m), "itemsToFillFront capacity sanity check after clone")
+	initMap := dClone.m
+	res := 0
+	var zero T
+	for {
+		dClone.PushFront(zero)
+		if cap(dClone.m) != oldCap {
+			break
+		}
+		res++
+	}
+	AssertNotSameSlice(t, initMap, dClone.m)
+	return res
+}
+
+func itemsToFillBack[T any](t *testing.T, d *Deque[T]) int {
+	t.Helper()
+	oldCap := cap(d.m)
+	dClone := d.Clone()
+	AssertEq(t, oldCap, cap(dClone.m), "itemsToFillBack capacity sanity check after clone")
+	initMap := dClone.m
+	res := 0
+	var zero T
+	for {
+		dClone.PushBack(zero)
+		if cap(dClone.m) != oldCap {
+			break
+		}
+		res++
+	}
+	AssertNotSameSlice(t, initMap, dClone.m)
+	return res
 }

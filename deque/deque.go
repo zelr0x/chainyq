@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 	"math/bits"
+	"slices"
 	"strings"
 	"unsafe"
 
@@ -93,6 +94,19 @@ type dequeState[T any] struct {
 	front blockIndex // first item index
 	back  blockIndex // index of the slot just after last item
 	len   int
+}
+
+func (ds *dequeState[T]) cloneDequeState() dequeState[T] {
+	res := *ds
+	m := res.m
+	mClone := make([][]T, len(m))
+	for i, block := range m {
+		if block != nil {
+			mClone[i] = slices.Clone(block)
+		}
+	}
+	res.m = mClone
+	return res
 }
 
 type blockCfg struct {
@@ -270,6 +284,19 @@ func Len[T any](d *Deque[T]) int {
 	return d.len
 }
 
+// Clone clones the deque in its current state and with the same configuration,
+// including initial configuration. Does not clone the pool state.
+func (d *Deque[T]) Clone() *Deque[T] {
+	stateClone := d.cloneDequeState()
+	res := &Deque[T]{
+		dequeState: stateClone,
+		blockCfg:   d.blockCfg,
+		a:          d.a.clone(),
+		initCfg:    d.initCfg,
+	}
+	return res
+}
+
 // String implements fmt.Stringer, used for %v and %+v.
 func (d *Deque[T]) String() string {
 	if d == nil {
@@ -401,8 +428,8 @@ func (d *Deque[T]) BackPtr() (*T, bool) {
 	}
 	back := d.back
 	blk := back.blk
-	off := back.off
-	if off == 0 {
+	off := back.off - 1
+	if off < 0 {
 		blk--
 		off = d.blockSize - 1
 	}

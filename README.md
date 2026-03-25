@@ -178,7 +178,7 @@ The API of the deque itself consists of:
 - Random access operations: `Get`, `GetPtr`, `Set`
 - Memory control: `Reserve`, `ReserveFront`, `ReserveBack`, `EnsureFront`, `EnsureBack`, `ShrinkToFit`, `Clear`, `ClearRelease`
 - Iterators: `Iter`, `RevIter`, `BidiIter`
-- Misc: `String`, `GoString`, `Equals`
+- Misc: `String`, `GoString`, `Equals`, `Clone`
 - Slicing: `Slice`, `PtrSlice`
 - Collecting: `ToSlice`, `ToPtrSlice`, `ToChan`, `ToPtrChan`
 

@@ -18,9 +18,12 @@ import (
 	"github.com/zelr0x/chainyq/stack"
 )
 
+const defPoolCap int = 16
+
 // separating dequeAlloc and blockAlloc allows swapping impls
 // or hybrid strategies with multiple allocators.
 type dequeAlloc[T any] struct {
+	// If changes are made, don't forget clone() exists.
 	pool      stack.Stack[[]T]
 	blockSize int
 	pooled    bool
@@ -38,7 +41,7 @@ func newDequeAlloc[T any](cfg dequeAllocCfg) dequeAlloc[T] {
 		pooled:    cfg.pooled,
 	}
 	if cfg.pooled {
-		a.pool = stack.NewValue[[]T](16)
+		a.pool = newPool[T](defPoolCap)
 	}
 	return a
 }
@@ -76,4 +79,17 @@ func (a *dequeAlloc[T]) ReleaseAll() {
 
 func allocate[T any](blockSize int) []T {
 	return make([]T, blockSize)
+}
+
+func newPool[T any](capBlocks int) stack.Stack[[]T] {
+	return stack.NewValue[[]T](capBlocks)
+}
+
+// Clone this dequeAlloc, but don't clone the pool state.
+func (a *dequeAlloc[T]) clone() dequeAlloc[T] {
+	res := *a
+	if res.pooled {
+		res.pool = newPool[T](defPoolCap)
+	}
+	return res
 }
