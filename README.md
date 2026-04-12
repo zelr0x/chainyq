@@ -14,6 +14,8 @@ while prioritizing memory control, static dispatch and deliberately avoiding
 errors and panics to reduce complexity and overhead.
 Written in Go 1.25 with zero dependencies.
 
+<img src="docs/images/bench.png" alt="Deque benchmarks" width="800"/>
+
 
 ## What's inside
 
