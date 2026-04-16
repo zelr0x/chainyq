@@ -15,6 +15,7 @@
 package numutil
 
 import (
+	"math"
 	"math/bits"
 )
 
@@ -33,4 +34,11 @@ func RoundNextPow2(x uint) uint {
 		return 1
 	}
 	return 1 << (bits.Len(x - 1))
+}
+
+func U64ToInt(u uint64) int {
+	if u > uint64(math.MaxInt) {
+		return math.MaxInt
+	}
+	return int(u)
 }

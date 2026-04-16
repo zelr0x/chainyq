@@ -293,10 +293,10 @@ func (it *Iter[T]) NextPtr() (*T, bool) {
 
 // Seq creates a lazy sequence from this iterator.
 func (it *Iter[T]) Seq() seq.Seq[T] {
-	return seq.New(it.Next)
+	return seq.ExactSized(it.Next, len(it.s))
 }
 
 // PtrSeq creates a lazy sequence from this iterator.
 func (it *Iter[T]) PtrSeq() seq.Seq[*T] {
-	return seq.New(it.NextPtr)
+	return seq.ExactSized(it.NextPtr, len(it.s))
 }

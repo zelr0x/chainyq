@@ -1763,6 +1763,34 @@ func TestBidiStepBackAfterBlockFilled(t *testing.T) {
 	AssertEq(t, d.blockSize-1, it.cur.off)
 }
 
+func TestIterSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.Iter().Seq().ToSlice()
+	AssertSliceEq(t, slice, got)
+}
+
+func TestIterPtrSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.Iter().PtrSeq().ToSlice()
+	AssertPtrSliceEq(t, slice, got)
+}
+
+func TestRevIterSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.RevIter().Seq().ToSlice()
+	AssertSliceEq(t, ReversedSlice(slice), got)
+}
+
+func TestRevIterPtrSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.RevIter().PtrSeq().ToSlice()
+	AssertPtrSliceEq(t, ReversedSlice(slice), got)
+}
+
 func TestDequeExample1(t *testing.T) {
 	d := FromSlice([]int{2, 4, 8, 16})
 	v, ok := d.PopBack()

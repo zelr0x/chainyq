@@ -31,7 +31,7 @@ Written in Go 1.25 with zero dependencies.
 - `Stack[T any]` - a slice-based stack
   - Fast, *O*(1) `Push`, `Pop` and `Peek`
   - Top-down iterator
-- `Seq[T any]` - extremely lightweight and simple lazy sequence
+- `Seq[T any]` - lightweight lazy sequence for functional transformations
   - `Filter`, `Map`, `FlatMap`, `Reduce`, `ForEach`, `ToSlice`, `ToMap`, `GroupBy`, etc.
   - Can be created from iterators, slices, and just functions
   - Supports lazy infinite sequences
@@ -321,17 +321,16 @@ func main() {
 
 
 ## Seq[T any]
-`seq.Seq` is an extremely lightweight lazy, composable sequence abstraction.
+`seq.Seq` is a lightweight lazy, composable sequence abstraction.
 It wraps a generator function `func() (T, bool)` and exposes a fluent API
 for filtering, transforming, grouping, and collecting values. Unlike eager
 collections, Seq only computes elements on demand, making it efficient for
 pipelines and transformations over potentially large or infinite sources.
 
 `Seq` is heavily inspired by functional programming but it diverges from
-many implementations in that `Seq` does not bring a plethora of special types
-that do the heavy lifting - `Seq` is a very thin wrapper around a closure.
-That's it. A single function pointer and whatever state the closure captures.
-Extremely simple, lightweight, zero dependencies.
+some implementations in that `Seq` does not bring a plethora of special types
+that do the heavy lifting - `Seq` is a just wrapper around a closure that
+pulls the next item from a source.
 
 ```go
 import (
@@ -395,6 +394,20 @@ that allow specifying capacity hints.
 You can also group items into categories using `seq.GroupBy[T, K]`.
 
 See docs for the full list of available operations.
+
+#### Seq Invalidation
+
+Transformations on a sequence (upstream) produce a new sequence (downstream).
+All sequences derived from the same upstream share the same underlying iterator.
+As a result, once a terminal operation is invoked on any sequence, the upstream
+and all of its downstreams are invalidated and must not be used further.
+
+All exceptions to those rules are documented explicitly. As an example,
+`Count` and `CountU64` don't consume the upstream if the sequence is `ExactSized`,
+but only if you haven't applied intermediate ops that lose size hints like `Filter`.
+As a rule of thumb: after applying a transformation, do not continue using
+the original sequence unless it is explicitly specified to be safe.
+`IsExactSized` can be used to check if the sequence is `ExactSized`.
 
 ### More complex example
 

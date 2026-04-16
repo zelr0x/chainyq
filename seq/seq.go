@@ -17,11 +17,35 @@
 // to be defined as free functions, primarily due to go's generic limitations.
 package seq
 
+import (
+	"math"
+
+	"github.com/zelr0x/chainyq/internal/numutil"
+)
+
 // Seq is a lazy iterator over a potentially infinite sequence of values.
-// It is a value type, there's no reason to pass it by reference.
+// No elements are consumed until the downstream is iterated.
+//
+// Transformations on a sequence (upstream) produce a new sequence (downstream).
+// All sequences derived from the same upstream share the same underlying iterator.
+// As a result, once a terminal operation is invoked on any sequence, the upstream
+// and all of its downstreams are invalidated and must not be used further.
+//
+// All exceptions to those rules are documented explicitly. As an example,
+// [Count] and [CountU64] don't consume the upstream if the sequence is ExactSized,
+// but only if you haven't applied intermediate ops that lose size hints like [Filter].
+// As a rule of thumb: after applying a transformation, do not continue using
+// the original sequence unless it is explicitly specified to be safe.
+// [IsExactSized] can be used to check if the sequence is ExactSized.
+//
+// Seq is a value type, there's no reason to pass it by reference.
+//
 // Seq is not concurrency-safe.
 type Seq[T any] struct {
-	next func() (T, bool)
+	next      func() (T, bool)
+	skip      func(int)
+	remaining *uint64
+	maxLen    uint64
 }
 
 // New creates a new Seq using the specified generator function.
@@ -58,7 +82,44 @@ type Seq[T any] struct {
 //	})
 //	s.Take(5).ToSlice()  // []int{42, 7, 88, 13, 56} (random values)
 func New[T any](next func() (T, bool)) Seq[T] {
-	return Seq[T]{next: next}
+	return newSeq(next, nil, nil, 0)
+}
+
+// Sized creates a Seq with a known upper-bound on length.
+func Sized[T any](next func() (T, bool), maxLen int) Seq[T] {
+	if maxLen <= 0 {
+		return newTerminated[T]()
+	}
+	return SizedU64(next, uint64(maxLen))
+}
+
+// SizedU64 creates a Seq with a known upper-bound on length.
+func SizedU64[T any](next func() (T, bool), maxLen uint64) Seq[T] {
+	if maxLen <= 0 {
+		return newTerminated[T]()
+	}
+	return newSeq(next, nil, nil, maxLen)
+}
+
+// ExactSized creates a Seq with a known exact length.
+func ExactSized[T any](next func() (T, bool), exactLen int) Seq[T] {
+	if exactLen <= 0 {
+		return newTerminated[T]()
+	}
+	return ExactSizedU64(next, uint64(exactLen))
+}
+
+// ExactSizedU64 creates a Seq with a known exact length.
+func ExactSizedU64[T any](next func() (T, bool), exactLen uint64) Seq[T] {
+	if exactLen <= 0 {
+		return newTerminated[T]()
+	}
+	return newSeq(next, nil, &exactLen, exactLen)
+}
+
+func (seq Seq[T]) WithSkip(skip func(int)) Seq[T] {
+	seq.skip = skip
+	return seq
 }
 
 // Creates a new Seq from the specified slice.
@@ -66,18 +127,21 @@ func New[T any](next func() (T, bool)) Seq[T] {
 //
 //	s := seq.FromSlice([]int{1, 2, 3, 4})
 func FromSlice[T any](slice []T) Seq[T] {
-	if len(slice) == 0 {
+	n := len(slice)
+	if n == 0 {
 		return newTerminated[T]()
 	}
 	i := 0
-	return New(func() (T, bool) {
-		if i >= len(slice) {
+	return ExactSized(func() (T, bool) {
+		if i >= n {
 			var zero T
 			return zero, false
 		}
 		v := slice[i]
 		i++
 		return v, true
+	}, n).WithSkip(func(k int) {
+		i += k
 	})
 }
 
@@ -113,17 +177,41 @@ func FromChan[T any](ch <-chan T) Seq[T] {
 // Empty creates an empty Seq. This is the same as var s Seq[T]
 // but nil-safe and clearly documents the intent.
 func Empty[T any]() Seq[T] {
+	return newTerminated[T]()
+}
+
+func newTerminated[T any]() Seq[T] {
+	// It is possible to use ExactSized here, but it will require allocating
+	// a pointer to 0. Shared ptr is potentially brittle, so it is unsized for now.
 	return New(func() (T, bool) {
 		var zero T
 		return zero, false
 	})
 }
 
-func newTerminated[T any]() Seq[T] {
-	return New(func() (T, bool) {
-		var zero T
-		return zero, false
-	})
+func newSeq[T any](
+	next func() (T, bool),
+	skip func(int),
+	remaining *uint64,
+	maxLen uint64,
+) Seq[T] {
+	return Seq[T]{next: next, skip: skip, remaining: remaining, maxLen: maxLen}
+}
+
+func (seq Seq[T]) lenOr(fallback int) int {
+	if seq.IsExactSized() {
+		return numutil.U64ToInt(*seq.remaining)
+	}
+	if seq.maxLen > 0 {
+		return numutil.U64ToInt(seq.maxLen)
+	}
+	return fallback
+}
+
+// IsExactSized returns true if the sequence is ExactSized
+// i.e. it knows the exact size of the underlying source.
+func (seq Seq[T]) IsExactSized() bool {
+	return seq.remaining != nil
 }
 
 // Next yields the next element of a sequence.
@@ -135,7 +223,11 @@ func newTerminated[T any]() Seq[T] {
 //	s.Next()  // 2, true
 //	s.Next()  // 0, false
 func (seq Seq[T]) Next() (T, bool) {
-	return seq.next()
+	v, ok := seq.next()
+	if seq.IsExactSized() && ok {
+		*seq.remaining--
+	}
+	return v, ok
 }
 
 // Filter yields only those elements of the sequence
@@ -147,7 +239,7 @@ func (seq Seq[T]) Next() (T, bool) {
 //	evens := s.Filter(func(x int) bool { return x % 2 == 0 })
 //	evens.ToSlice()  // []int{2, 4}
 func (seq Seq[T]) Filter(pred func(T) bool) Seq[T] {
-	return New(func() (T, bool) {
+	r := New(func() (T, bool) {
 		for v, ok := seq.next(); ok; v, ok = seq.next() {
 			if pred(v) {
 				return v, true
@@ -156,6 +248,8 @@ func (seq Seq[T]) Filter(pred func(T) bool) Seq[T] {
 		var zero T
 		return zero, false
 	})
+	r.maxLen = seq.maxLen
+	return r
 }
 
 // Take yields at most n elements from the sequence,
@@ -166,12 +260,20 @@ func (seq Seq[T]) Filter(pred func(T) bool) Seq[T] {
 //	s := seq.FromSlice([]int{1, 2, 3, 4})
 //	firstTwo := s.Take(2).ToSlice()  // []int{1, 2}
 func (seq Seq[T]) Take(n int) Seq[T] {
-	if n < 1 {
+	if n <= 0 {
 		return newTerminated[T]()
 	}
-	count := 0
-	return New(func() (T, bool) {
-		if count >= n {
+	nu64 := uint64(n)
+	var rem *uint64 = nil
+	if seq.IsExactSized() {
+		r := *seq.remaining
+		if r < nu64 {
+			nu64 = r
+		}
+		rem = &nu64
+	}
+	return newSeq(func() (T, bool) {
+		if nu64 <= 0 {
 			var zero T
 			return zero, false
 		}
@@ -180,9 +282,9 @@ func (seq Seq[T]) Take(n int) Seq[T] {
 			var zero T
 			return zero, false
 		}
-		count++
+		nu64--
 		return v, true
-	})
+	}, seq.skip, rem, nu64)
 }
 
 // Skip discards the first n elements of the sequence,
@@ -193,18 +295,35 @@ func (seq Seq[T]) Take(n int) Seq[T] {
 //	s := seq.FromSlice([]int{1, 2, 3, 4})
 //	rest := s.Skip(2).ToSlice()  // []int{3, 4}
 func (seq Seq[T]) Skip(n int) Seq[T] {
-	count := 0
-	return New(func() (T, bool) {
-		for v, ok := seq.next(); ok; v, ok = seq.next() {
-			if count < n {
-				count++
-				continue
+	if n <= 0 {
+		return seq
+	}
+	nu64 := uint64(n)
+	if seq.maxLen > 0 && nu64 > seq.maxLen {
+		return newTerminated[T]()
+	}
+	var rem *uint64 = nil
+	maxLen := seq.maxLen
+	if seq.IsExactSized() {
+		r := *seq.remaining - nu64
+		maxLen = r
+		rem = &r
+	} else if maxLen > nu64 {
+		maxLen -= nu64
+	}
+	return newSeq(func() (T, bool) {
+		if n > 0 {
+			if seq.skip != nil {
+				seq.skip(n)
+			} else {
+				for range n {
+					_, _ = seq.next()
+				}
 			}
-			return v, true
+			n = 0
 		}
-		var zero T
-		return zero, false
-	})
+		return seq.next()
+	}, seq.skip, rem, maxLen)
 }
 
 // SkipWhile skips elements from the sequence as long as pred returns true.
@@ -216,16 +335,24 @@ func (seq Seq[T]) Skip(n int) Seq[T] {
 //	rest := s.SkipWhile(func(x int) bool { return x < 3 })
 //	rest.ToSlice()  // []int{3, 4}
 func (seq Seq[T]) SkipWhile(pred func(T) bool) Seq[T] {
-	return New(func() (T, bool) {
-		for v, ok := seq.next(); ok; v, ok = seq.next() {
-			if pred(v) {
-				continue
+	skipped := false
+	return newSeq(func() (T, bool) {
+		if !skipped {
+			i := 0
+			for v, ok := seq.next(); ok; v, ok = seq.next() {
+				if pred(v) {
+					i++
+					continue
+				}
+				skipped = true
+				if seq.IsExactSized() {
+					*seq.remaining -= uint64(i)
+				}
+				return v, ok
 			}
-			return v, true
 		}
-		var zero T
-		return zero, false
-	})
+		return seq.next()
+	}, seq.skip, seq.remaining, seq.maxLen)
 }
 
 // Map transforms each element of the sequence using f,
@@ -237,14 +364,14 @@ func (seq Seq[T]) SkipWhile(pred func(T) bool) Seq[T] {
 //	doubled := Map(s, func(x int) int { return x * 2 })
 //	doubled.ToSlice()  // []int{2, 4, 6}
 func Map[T any, R any](seq Seq[T], f func(T) R) Seq[R] {
-	return New(func() (R, bool) {
+	return newSeq(func() (R, bool) {
 		v, ok := seq.next()
 		if !ok {
 			var zero R
 			return zero, false
 		}
 		return f(v), true
-	})
+	}, seq.skip, seq.remaining, seq.maxLen)
 }
 
 // FlatMap transforms each element of the sequence using the given function f,
@@ -259,41 +386,56 @@ func Map[T any, R any](seq Seq[T], f func(T) R) Seq[R] {
 //	}).ToSlice()  // [1 10 2 20 3 30]
 func FlatMap[T any, R any](seq Seq[T], f func(T) Seq[R]) Seq[R] {
 	inner := Empty[R]()
-	return New(func() (R, bool) {
+	return newSeq(func() (R, bool) {
 		for {
 			v, ok := inner.next()
 			if ok {
 				return v, ok
 			}
-			outer, ok := seq.Next()
+			outer, ok := seq.next()
 			if !ok {
 				var zero R
 				return zero, false
 			}
 			inner = f(outer)
 		}
-	})
+	}, nil, nil, 0) // nil and 0 because FlatMap can grow past maxLen.
 }
 
-// Count iterates over all the items in the sequence and counts them.
-// Returns the count on finite sequences, hangs on infinite sequences.
+// Count consumes all items in the sequence and returns their count.
+// Hangs forever on infinite sequences.
+//
+// Invalidation exception: does not consume ExactSized sequences.
+//
 // Example:
 //
 //	s := seq.FromSlice([]int{1, 2, 3}).Count()  // 3
 func (seq Seq[T]) Count() int {
+	if seq.IsExactSized() {
+		return numutil.U64ToInt(*seq.remaining)
+	}
 	var count int
 	seq.ForEach(func(x T) {
 		count++
 	})
+	if count < 0 {
+		return math.MaxInt
+	}
 	return count
 }
 
-// Count iterates over all the items in the sequence and counts them.
-// Returns the count on finite sequences, hangs on infinite sequences.
+// Count consumes all items in the sequence and returns their count.
+// Hangs forever on infinite sequences.
+//
+// Invalidation exception: does not consume ExactSized sequences.
+//
 // Example:
 //
 //	s := seq.FromSlice([]int{1, 2, 3}).CountU64()  // 3 (uint64)
 func (seq Seq[T]) CountU64() uint64 {
+	if seq.IsExactSized() {
+		return *seq.remaining
+	}
 	var count uint64
 	seq.ForEach(func(x T) {
 		count++
@@ -314,6 +456,9 @@ func (seq Seq[T]) ForEach(f func(T)) {
 	for v, ok := seq.next(); ok; v, ok = seq.next() {
 		f(v)
 	}
+	if seq.IsExactSized() {
+		*seq.remaining = 0
+	}
 }
 
 // ForEachUntil applies f to each element until f returns false,
@@ -327,10 +472,18 @@ func (seq Seq[T]) ForEach(f func(T)) {
 //	   	return x < 3 // stop once x >= 3, 3 will be printed
 //		})
 func (seq Seq[T]) ForEachUntil(f func(T) bool) {
+	i := 0
 	for v, ok := seq.next(); ok; v, ok = seq.next() {
 		if !f(v) {
+			if seq.IsExactSized() {
+				*seq.remaining -= uint64(i)
+			}
 			return
 		}
+		i++
+	}
+	if seq.IsExactSized() {
+		*seq.remaining = 0
 	}
 }
 
@@ -348,9 +501,15 @@ func (seq Seq[T]) ForEachIndexed(f func(int, T) bool) {
 	i := 0
 	for v, ok := seq.next(); ok; v, ok = seq.next() {
 		if !f(i, v) {
+			if seq.IsExactSized() {
+				*seq.remaining -= uint64(i)
+			}
 			return
 		}
 		i++
+	}
+	if seq.IsExactSized() {
+		*seq.remaining = 0
 	}
 }
 
@@ -360,7 +519,7 @@ func (seq Seq[T]) ForEachIndexed(f func(int, T) bool) {
 //
 //	seq.FromSlice([]int{1, 2, 3}).ToSlice()  // []int{1, 2, 3}
 func (seq Seq[T]) ToSlice() []T {
-	res := make([]T, 0, 16)
+	res := make([]T, 0, seq.lenOr(16))
 	seq.ForEach(func(x T) {
 		res = append(res, x)
 	})

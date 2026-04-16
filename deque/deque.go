@@ -1203,12 +1203,12 @@ func (it *Iter[T]) SkipWhilePtr(pred func(*T) bool) *Iter[T] {
 
 // Seq creates a lazy sequence from this iterator.
 func (it *Iter[T]) Seq() seq.Seq[T] {
-	return seq.New(it.Next)
+	return it.b.Seq()
 }
 
 // PtrSeq creates a lazy sequence from this iterator.
 func (it *Iter[T]) PtrSeq() seq.Seq[*T] {
-	return seq.New(it.NextPtr)
+	return it.b.PtrSeq()
 }
 
 // ----- RevIter -----
@@ -1417,12 +1417,12 @@ func (it *RevIter[T]) SkipWhilePtr(pred func(*T) bool) *RevIter[T] {
 
 // Seq creates a lazy sequence from this iterator.
 func (it *RevIter[T]) Seq() seq.Seq[T] {
-	return seq.New(it.Next)
+	return it.b.RevSeq()
 }
 
 // PtrSeq creates a lazy sequence from this iterator.
 func (it *RevIter[T]) PtrSeq() seq.Seq[*T] {
-	return seq.New(it.NextPtr)
+	return it.b.RevPtrSeq()
 }
 
 // ----- BidiIter -----
@@ -1726,24 +1726,32 @@ func (it *BidiIter[T]) SkipWhilePtr(pred func(*T) bool) *BidiIter[T] {
 
 // Seq creates a lazy sequence from this iterator.
 func (it *BidiIter[T]) Seq() seq.Seq[T] {
-	return seq.New(it.Next)
+	return seq.ExactSized(it.Next, it.d.len-it.pos).WithSkip(func(n int) {
+		it.Skip(n)
+	})
 }
 
 // PtrSeq creates a lazy sequence from this iterator.
 func (it *BidiIter[T]) PtrSeq() seq.Seq[*T] {
-	return seq.New(it.NextPtr)
+	return seq.ExactSized(it.NextPtr, it.d.len-it.pos).WithSkip(func(n int) {
+		it.Skip(n)
+	})
 }
 
 // RevSeq creates a reverse lazy sequence from this iterator.
 func (it *BidiIter[T]) RevSeq() seq.Seq[T] {
 	rev := it.Clone().ResetBack()
-	return seq.New(rev.Prev)
+	return seq.ExactSized(rev.Prev, it.pos).WithSkip(func(n int) {
+		it.SkipBack(n)
+	})
 }
 
 // RevPtrSeq creates a reverse lazy sequence from this iterator.
 func (it *BidiIter[T]) RevPtrSeq() seq.Seq[*T] {
 	rev := it.Clone().ResetBack()
-	return seq.New(rev.PrevPtr)
+	return seq.ExactSized(rev.PrevPtr, it.pos).WithSkip(func(n int) {
+		it.SkipBack(n)
+	})
 }
 
 // moveUnsafe moves the current iterator n positions to the direction dictated

@@ -1014,6 +1014,34 @@ func TestDocExample1(t *testing.T) {
 	AssertSliceEq(t, []int{2, 4, 100}, s, "State after Reset-Skip-TakeSlice")
 }
 
+func TestIterSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.Iter().Seq().ToSlice()
+	AssertSliceEq(t, slice, got)
+}
+
+func TestIterPtrSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.Iter().PtrSeq().ToSlice()
+	AssertPtrSliceEq(t, slice, got)
+}
+
+func TestRevIterSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.RevIter().Seq().ToSlice()
+	AssertSliceEq(t, ReversedSlice(slice), got)
+}
+
+func TestRevIterPtrSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.RevIter().PtrSeq().ToSlice()
+	AssertPtrSliceEq(t, ReversedSlice(slice), got)
+}
+
 // ----- Helpers -----
 func listFromRangeIncl(t *testing.T, from, toIncl int) *List[int] {
 	t.Helper()

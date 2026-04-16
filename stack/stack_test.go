@@ -149,6 +149,20 @@ func TestStringStackOps(t *testing.T) {
 	}
 }
 
+func TestIterSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.Iter().Seq().ToSlice()
+	AssertSliceEq(t, ReversedSlice(slice), got)
+}
+
+func TestIterPtrSeqToSlice(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	l := FromSlice(slice)
+	got := l.Iter().PtrSeq().ToSlice()
+	AssertPtrSliceEq(t, ReversedSlice(slice), got)
+}
+
 func TestStackExample1(t *testing.T) {
 	s := New[int]()
 	s.Push(1)
