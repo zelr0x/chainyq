@@ -17,9 +17,11 @@ package stack
 
 import (
 	"fmt"
+	"iter"
 	"slices"
 	"strings"
 
+	"github.com/zelr0x/chainyq/internal/iterutil"
 	"github.com/zelr0x/chainyq/seq"
 )
 
@@ -299,4 +301,14 @@ func (it *Iter[T]) Seq() seq.Seq[T] {
 // PtrSeq creates a lazy sequence from this iterator.
 func (it *Iter[T]) PtrSeq() seq.Seq[*T] {
 	return seq.ExactSized(it.NextPtr, len(it.s))
+}
+
+// IterAll creates iter.Seq from this iterator, starting with the next item.
+func (it *Iter[T]) IterAll() iter.Seq[T] {
+	return iterutil.IterSeq(it.Next)
+}
+
+// IterAllPtr creates iter.Seq from this iterator, starting with the next item.
+func (it *Iter[T]) IterAllPtr() iter.Seq[*T] {
+	return iterutil.IterSeq(it.NextPtr)
 }

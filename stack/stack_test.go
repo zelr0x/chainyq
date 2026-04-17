@@ -163,6 +163,30 @@ func TestIterPtrSeqToSlice(t *testing.T) {
 	AssertPtrSliceEq(t, ReversedSlice(slice), got)
 }
 
+func TestIterIterAll(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	rev := ReversedSlice(slice)
+	s := FromSlice(slice)
+
+	got := make([]int, 0, len(rev))
+	for v := range s.Iter().IterAll() {
+		got = append(got, v)
+	}
+	AssertSliceEq(t, rev, got)
+}
+
+func TestIterIterAllPtr(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	rev := ReversedSlice(slice)
+	s := FromSlice(slice)
+
+	got := make([]*int, 0, len(rev))
+	for v := range s.Iter().IterAllPtr() {
+		got = append(got, v)
+	}
+	AssertPtrSliceEq(t, rev, got)
+}
+
 func TestStackExample1(t *testing.T) {
 	s := New[int]()
 	s.Push(1)

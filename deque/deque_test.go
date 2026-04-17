@@ -1765,51 +1765,125 @@ func TestBidiStepBackAfterBlockFilled(t *testing.T) {
 
 func TestIterSeqToSlice(t *testing.T) {
 	slice := SliceFromRangeExcl(t, 0, 33)
-	l := FromSlice(slice)
+	d := FromSlice(slice)
 
-	got := l.Iter().Seq().ToSlice()
+	got := d.Iter().Seq().ToSlice()
 	AssertSliceEq(t, slice, got, "from start")
 
 	k := len(slice) / 2
-	got = l.Iter().Skip(k).Seq().ToSlice()
+	got = d.Iter().Skip(k).Seq().ToSlice()
 	AssertSliceEq(t, slice[k:], got, "from mid")
 }
 
 func TestIterPtrSeqToSlice(t *testing.T) {
 	slice := SliceFromRangeExcl(t, 0, 33)
-	l := FromSlice(slice)
+	d := FromSlice(slice)
 
-	got := l.Iter().PtrSeq().ToSlice()
+	got := d.Iter().PtrSeq().ToSlice()
 	AssertPtrSliceEq(t, slice, got, "from start")
 
 	k := len(slice) / 2
-	got = l.Iter().Skip(k).PtrSeq().ToSlice()
+	got = d.Iter().Skip(k).PtrSeq().ToSlice()
 	AssertPtrSliceEq(t, slice[k:], got, "from mid")
 }
 
 func TestRevIterSeqToSlice(t *testing.T) {
 	slice := SliceFromRangeExcl(t, 0, 33)
 	rev := ReversedSlice(slice)
-	l := FromSlice(slice)
+	d := FromSlice(slice)
 
-	got := l.RevIter().Seq().ToSlice()
+	got := d.RevIter().Seq().ToSlice()
 	AssertSliceEq(t, rev, got, "from start")
 
 	k := len(rev) / 2
-	got = l.RevIter().Skip(k).Seq().ToSlice()
+	got = d.RevIter().Skip(k).Seq().ToSlice()
 	AssertSliceEq(t, rev[k:], got, "from mid")
 }
 
 func TestRevIterPtrSeqToSlice(t *testing.T) {
 	slice := SliceFromRangeExcl(t, 0, 33)
 	rev := ReversedSlice(slice)
-	l := FromSlice(slice)
+	d := FromSlice(slice)
 
-	got := l.RevIter().PtrSeq().ToSlice()
+	got := d.RevIter().PtrSeq().ToSlice()
 	AssertPtrSliceEq(t, rev, got, "from start")
 
 	k := len(rev) / 2
-	got = l.RevIter().Skip(k).PtrSeq().ToSlice()
+	got = d.RevIter().Skip(k).PtrSeq().ToSlice()
+	AssertPtrSliceEq(t, rev[k:], got, "from mid")
+}
+
+func TestIterIterAll(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	d := FromSlice(slice)
+
+	got := make([]int, 0, len(slice))
+	for v := range d.Iter().IterAll() {
+		got = append(got, v)
+	}
+	AssertSliceEq(t, slice, got, "from start")
+
+	k := len(slice) / 2
+	got = got[:0]
+	for v := range d.Iter().Skip(k).IterAll() {
+		got = append(got, v)
+	}
+	AssertSliceEq(t, slice[k:], got, "from mid")
+}
+
+func TestIterIterAllPtr(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	d := FromSlice(slice)
+
+	got := make([]*int, 0, len(slice))
+	for v := range d.Iter().IterAllPtr() {
+		got = append(got, v)
+	}
+	AssertPtrSliceEq(t, slice, got, "from start")
+
+	k := len(slice) / 2
+	got = got[:0]
+	for v := range d.Iter().Skip(k).IterAllPtr() {
+		got = append(got, v)
+	}
+	AssertPtrSliceEq(t, slice[k:], got, "from mid")
+}
+
+func TestRevIterIterAll(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	rev := ReversedSlice(slice)
+	d := FromSlice(slice)
+
+	got := make([]int, 0, len(slice))
+	for v := range d.RevIter().IterAll() {
+		got = append(got, v)
+	}
+	AssertSliceEq(t, rev, got, "from start")
+
+	k := len(rev) / 2
+	got = got[:0]
+	for v := range d.RevIter().Skip(k).IterAll() {
+		got = append(got, v)
+	}
+	AssertSliceEq(t, rev[k:], got, "from mid")
+}
+
+func TestRevIterIterAllPtr(t *testing.T) {
+	slice := SliceFromRangeExcl(t, 0, 33)
+	rev := ReversedSlice(slice)
+	d := FromSlice(slice)
+
+	got := make([]*int, 0, len(slice))
+	for v := range d.RevIter().IterAllPtr() {
+		got = append(got, v)
+	}
+	AssertPtrSliceEq(t, rev, got, "from start")
+
+	k := len(rev) / 2
+	got = got[:0]
+	for v := range d.RevIter().Skip(k).IterAllPtr() {
+		got = append(got, v)
+	}
 	AssertPtrSliceEq(t, rev[k:], got, "from mid")
 }
 

@@ -21,6 +21,7 @@ import (
 	"iter"
 	"math"
 
+	"github.com/zelr0x/chainyq/internal/iterutil"
 	"github.com/zelr0x/chainyq/internal/numutil"
 )
 
@@ -627,7 +628,7 @@ func (seq Seq[T]) ForEachIndexed(f func(int, T) bool) {
 	}
 }
 
-// Sub takes a subsequence of size end-start items after skipping start items.
+// Slice takes a subsequence of size end-start items after skipping start items.
 // If start or end are negative or if end is greater than start, empty sequence
 // is returned.
 func (s Seq[T]) Slice(start, end int) Seq[T] {
@@ -645,19 +646,9 @@ func (s Seq[T]) IterSlice(start, end int) iter.Seq[T] {
 	return s.Slice(start, end).IterAll()
 }
 
-// All returns [iter.Seq] so Seq can be iterated with range.
+// IterAll returns [iter.Seq] so Seq can be iterated with range.
 func (s Seq[T]) IterAll() iter.Seq[T] {
-	return func(yield func(T) bool) {
-		for {
-			v, ok := s.next()
-			if !ok {
-				return
-			}
-			if !yield(v) {
-				return
-			}
-		}
-	}
+	return iterutil.IterSeq(s.next)
 }
 
 // ToSlice collects all elements of the sequence into a slice.

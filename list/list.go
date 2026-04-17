@@ -17,9 +17,11 @@ package list
 
 import (
 	"fmt"
+	"iter"
 	"strings"
 
 	"github.com/zelr0x/chainyq"
+	"github.com/zelr0x/chainyq/internal/iterutil"
 	"github.com/zelr0x/chainyq/seq"
 )
 
@@ -707,6 +709,16 @@ func (it *Iter[T]) PtrSeq() seq.Seq[*T] {
 	return it.b.PtrSeq()
 }
 
+// IterAll creates iter.Seq from this iterator, starting with the next item.
+func (it *Iter[T]) IterAll() iter.Seq[T] {
+	return iterutil.IterSeq(it.Next)
+}
+
+// IterAllPtr creates iter.Seq from this iterator, starting with the next item.
+func (it *Iter[T]) IterAllPtr() iter.Seq[*T] {
+	return iterutil.IterSeq(it.NextPtr)
+}
+
 // ----- RevIter -----
 
 // Clone creates a new reverse iterator to the same underlying list,
@@ -956,6 +968,16 @@ func (it *RevIter[T]) Seq() seq.Seq[T] {
 // PtrSeq creates a lazy sequence from this iterator.
 func (it *RevIter[T]) PtrSeq() seq.Seq[*T] {
 	return it.b.RevPtrSeq()
+}
+
+// IterAll creates iter.Seq from this iterator, starting with the next item.
+func (it *RevIter[T]) IterAll() iter.Seq[T] {
+	return iterutil.IterSeq(it.Next)
+}
+
+// IterAllPtr creates iter.Seq from this iterator, starting with the next item.
+func (it *RevIter[T]) IterAllPtr() iter.Seq[*T] {
+	return iterutil.IterSeq(it.NextPtr)
 }
 
 // ----- BidiIter -----
