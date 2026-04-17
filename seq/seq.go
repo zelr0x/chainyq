@@ -403,6 +403,59 @@ func FlatMap[T any, R any](seq Seq[T], f func(T) Seq[R]) Seq[R] {
 	}, nil, nil, 0) // nil and 0 because FlatMap can grow past maxLen.
 }
 
+// Find returns the first element in the sequence that satisfies
+// the given predicate. It short-circuits as soon as a match is found.
+// Returns zero and false if no element satisfies the predicate.
+func (seq Seq[T]) Find(pred func(T) bool) (T, bool) {
+	for v, ok := seq.next(); ok; v, ok = seq.next() {
+		if pred(v) {
+			return v, true
+		}
+	}
+	var zero T
+	return zero, false
+}
+
+// All tests if all items in the sequence satisfy the given predicate.
+// Returns true if all elements satisfy the predicate.
+// All is short-circuiting; it will stop processing as soon as it finds
+// an item that does not satisfy the given predicate.
+// Returns true on empty sequences because in this case there is no item
+// that does not satisfy the predicate.
+func (seq Seq[T]) All(pred func(T) bool) bool {
+	for v, ok := seq.next(); ok; v, ok = seq.next() {
+		if !pred(v) {
+			return false
+		}
+	}
+	return true
+}
+
+// Any tests if any item in the sequence satisfies the given predicate.
+// Returns true if any item satisfies the predicate.
+// Any is short-circuiting; it will stop processing as soon as it finds
+// an item that satisfies the given predicate.
+// Returns false on empty sequences, because in this case there is no item
+// that satisfies the predicate.
+func (seq Seq[T]) Any(pred func(T) bool) bool {
+	for v, ok := seq.next(); ok; v, ok = seq.next() {
+		if pred(v) {
+			return true
+		}
+	}
+	return false
+}
+
+// None tests if no item in the sequence satisfies the given predicate.
+// Returns true if no element satisfies the predicate.
+// None is short-circuiting; it will stop processing as soon as it finds
+// an item that satisfies the given predicate.
+// Returns true on empty sequences, because in this case there is no item
+// that satisfies the predicate.
+func (seq Seq[T]) None(pred func(T) bool) bool {
+	return !seq.Any(pred)
+}
+
 // Count consumes all items in the sequence and returns their count.
 // Hangs forever on infinite sequences.
 //

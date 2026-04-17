@@ -205,6 +205,66 @@ func TestFlatMap(t *testing.T) {
 	AssertSliceEq(t, []int{1, 10, 2, 20, 3, 30}, flat)
 }
 
+func TestFind(t *testing.T) {
+	tests := []struct {
+		name   string
+		data   []int
+		pred   func(int) bool
+		want   int
+		wantOK bool
+	}{
+		{"empty", []int{}, func(x int) bool { return x > 0 }, 0, false},
+		{"first satisfies", []int{2, 4, 6}, func(x int) bool { return x%2 == 0 }, 2, true},
+		{"third satisfies", []int{1, 4, 9}, func(x int) bool { return x%2 == 0 }, 4, true},
+		{"all satisfy", []int{2, 4, 6}, func(x int) bool { return x%2 == 0 }, 2, true},
+		{"two satisfy", []int{1, 2, 4}, func(x int) bool { return x%2 == 0 }, 2, true},
+		{"no satisfy", []int{1, 3, 5}, func(x int) bool { return x%2 == 0 }, 0, false},
+	}
+	for _, tt := range tests {
+		seq := FromSlice(tt.data)
+		got, ok := seq.Find(tt.pred)
+		AssertCommaOk(t, tt.want, tt.wantOK, got, ok, tt.name)
+	}
+}
+
+func TestAll(t *testing.T) {
+	tests := []struct {
+		name string
+		data []int
+		pred func(int) bool
+		want bool
+	}{
+		{"empty", []int{}, func(x int) bool { return x > 0 }, true},
+		{"all satisfy", []int{2, 4, 6}, func(x int) bool { return x%2 == 0 }, true},
+		{"one fails", []int{2, 3, 4}, func(x int) bool { return x%2 == 0 }, false},
+		{"all fail", []int{1, 3, 5}, func(x int) bool { return x%2 == 0 }, false},
+	}
+	for _, tt := range tests {
+		seq := FromSlice(tt.data)
+		got := seq.All(tt.pred)
+		AssertEq(t, tt.want, got, tt.name)
+	}
+}
+
+func TestAny(t *testing.T) {
+	tests := []struct {
+		name string
+		data []int
+		pred func(int) bool
+		want bool
+	}{
+		{"empty", []int{}, func(x int) bool { return x > 0 }, false},
+		{"one satisfies", []int{1, 2, 3}, func(x int) bool { return x%2 == 0 }, true},
+		{"all satisfy", []int{2, 4, 6}, func(x int) bool { return x%2 == 0 }, true},
+		{"none satisfy", []int{1, 3, 5}, func(x int) bool { return x%2 == 0 }, false},
+	}
+	for _, tt := range tests {
+		seq := FromSlice(tt.data)
+		got := seq.Any(tt.pred)
+		AssertEq(t, tt.want, got, tt.name)
+	}
+}
+
 func TestSeqCount(t *testing.T) {
 	tests := []struct {
 		name  string
