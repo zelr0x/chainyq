@@ -273,6 +273,64 @@ func TestForEachIndexed(t *testing.T) {
 	AssertSliceEq(t, want[:k+1], got)
 }
 
+func TestIterRange(t *testing.T) {
+	even := SliceFromRangeIncl(t, 1, 6)
+	odd := even[0 : len(even)-1]
+	tests := []struct {
+		name  string
+		slice []int
+		start int
+		end   int
+	}{
+		{"empty slice", []int{}, 0, 3},
+		{"full slice even length", even, 0, 6},
+		{"full slice odd length", odd, 0, 5},
+		{"partial slice middle", even, 2, 5},
+		{"slice with start=0 end=0", even, 0, 0},
+		{"slice with start=end", even, 3, 3},
+		{"slice with start>end", even, 4, 2},
+		{"slice with negative start", even, -2, 3},
+		{"slice with negative end", even, 0, -1},
+		{"slice with end beyond length", odd, 0, 10},
+		{"slice with start beyond length", odd, 10, 15},
+		{"slice covering tail", even, 4, 10},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			slice := tt.slice
+			start := tt.start
+			end := tt.end
+			var want []int
+			if start >= 0 && start < len(slice) && end > start {
+				want = slice[start:min(end, len(slice))]
+			} else {
+				want = []int{}
+			}
+
+			got := make([]int, 0, len(want))
+			for v := range FromSlice(slice).IterRange(start, end) {
+				got = append(got, v)
+			}
+			AssertSliceEq(t, want, got)
+
+			if len(want) > 0 {
+				k := len(want) / 2
+				want := want[:k]
+				got := make([]int, 0, k)
+				i := 0
+				for v := range FromSlice(slice).IterRange(start, end) {
+					got = append(got, v)
+					i++
+					if i == k {
+						break
+					}
+				}
+				AssertSliceEq(t, want, got)
+			}
+		})
+	}
+}
+
 func TestToMap(t *testing.T) {
 	s := FromSlice([]string{"apple", "apricot", "banana"})
 	m := ToMap(s,

@@ -18,6 +18,7 @@
 package seq
 
 import (
+	"iter"
 	"math"
 
 	"github.com/zelr0x/chainyq/internal/numutil"
@@ -510,6 +511,39 @@ func (seq Seq[T]) ForEachIndexed(f func(int, T) bool) {
 	}
 	if seq.IsExactSized() {
 		*seq.remaining = 0
+	}
+}
+
+// Sub takes a subsequence of size end-start items after skipping start items.
+// If start or end are negative or if end is greater than start, empty sequence
+// is returned.
+func (s Seq[T]) Slice(start, end int) Seq[T] {
+	if start < 0 || end <= start {
+		return newTerminated[T]()
+	}
+	return s.Skip(start).Take(end - start)
+}
+
+// Sub takes a subsequence of size end-start items after skipping start items
+// and returns it as [iter.Seq], so Seq can be iterated with range.
+// If start or end are negative or if end is greater than start, empty sequence
+// is returned.
+func (s Seq[T]) IterRange(start, end int) iter.Seq[T] {
+	return s.Slice(start, end).IterAll()
+}
+
+// All returns [iter.Seq] so Seq can be iterated with range.
+func (s Seq[T]) IterAll() iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for {
+			v, ok := s.next()
+			if !ok {
+				return
+			}
+			if !yield(v) {
+				return
+			}
+		}
 	}
 }
 
