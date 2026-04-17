@@ -27,17 +27,17 @@ import (
 // Seq is a lazy iterator over a potentially infinite sequence of values.
 // No elements are consumed until the downstream is iterated.
 //
-// Transformations on a sequence (upstream) produce a new sequence (downstream).
-// All sequences derived from the same upstream share the same underlying iterator.
-// As a result, once a terminal operation is invoked on any sequence, the upstream
-// and all of its downstreams are invalidated and must not be used further.
+// Transformations on a sequence (upstream) produce a new sequence
+// (downstream), which shares the underlying source with the upstream.
+// The items consumed from downstream sequences are consumed from upstream
+// all sequences unless different behavior is explicitly documented.
 //
-// All exceptions to those rules are documented explicitly. As an example,
-// [Count] and [CountU64] don't consume the upstream if the sequence is ExactSized,
-// but only if you haven't applied intermediate ops that lose size hints like [Filter].
 // As a rule of thumb: after applying a transformation, do not continue using
 // the original sequence unless it is explicitly specified to be safe.
-// [IsExactSized] can be used to check if the sequence is ExactSized.
+// For example, it is safe to use the upstream after [Take] or [Skip] - it will
+// contain the remaining items. As another example, [Count] will not consume
+// any items at all if exact size of the sequence is known.
+// [IsExactSized] can be used to check if exact size of the sequence is known.
 //
 // Seq is a value type, there's no reason to pass it by reference.
 //
@@ -212,7 +212,23 @@ func (seq Seq[T]) lenOr(fallback int) int {
 // IsExactSized returns true if the sequence is ExactSized
 // i.e. it knows the exact size of the underlying source.
 func (seq Seq[T]) IsExactSized() bool {
+	// This implementation itself is currently a contract relied upon.
 	return seq.remaining != nil
+}
+
+func (seq Seq[T]) decRemaining(n uint64) {
+	if n <= 0 {
+		return
+	}
+	if seq.remaining != nil {
+		rem := *seq.remaining
+		if rem <= n {
+			rem = 0
+		} else {
+			rem -= n
+		}
+		*seq.remaining = rem
+	}
 }
 
 // Next yields the next element of a sequence.
@@ -225,14 +241,17 @@ func (seq Seq[T]) IsExactSized() bool {
 //	s.Next()  // 0, false
 func (seq Seq[T]) Next() (T, bool) {
 	v, ok := seq.next()
-	if seq.IsExactSized() && ok {
-		*seq.remaining--
+	if ok {
+		seq.decRemaining(1)
 	}
 	return v, ok
 }
 
-// Filter yields only those elements of the sequence
-// for which pred returns true.
+// Filter creates a new sequence that yields only those upstream items
+// that satisfy the given predicate, fully consuming the upstream
+// in the process.
+//
+// Resulting sequence loses ExactSized capability if upstream had it.
 //
 // Example:
 //
@@ -240,21 +259,25 @@ func (seq Seq[T]) Next() (T, bool) {
 //	evens := s.Filter(func(x int) bool { return x % 2 == 0 })
 //	evens.ToSlice()  // []int{2, 4}
 func (seq Seq[T]) Filter(pred func(T) bool) Seq[T] {
-	r := New(func() (T, bool) {
+	return newSeq(func() (T, bool) {
 		for v, ok := seq.next(); ok; v, ok = seq.next() {
 			if pred(v) {
 				return v, true
 			}
 		}
+		if seq.IsExactSized() {
+			*seq.remaining = 0
+		}
 		var zero T
 		return zero, false
-	})
-	r.maxLen = seq.maxLen
-	return r
+	}, nil, nil, seq.maxLen)
 }
 
 // Take yields at most n elements from the sequence,
 // stopping once n elements have been produced or the sequence ends.
+//
+// Does not invalidate upstream, only consumes the specified number
+// of items from it.
 //
 // Example:
 //
@@ -273,13 +296,17 @@ func (seq Seq[T]) Take(n int) Seq[T] {
 		}
 		rem = &nu64
 	}
+	var i uint64 = 0
 	return newSeq(func() (T, bool) {
 		if nu64 <= 0 {
+			seq.decRemaining(i)
 			var zero T
 			return zero, false
 		}
 		v, ok := seq.next()
+		i++
 		if !ok {
+			seq.decRemaining(i)
 			var zero T
 			return zero, false
 		}
@@ -291,9 +318,13 @@ func (seq Seq[T]) Take(n int) Seq[T] {
 // TakeWhile returns a new Seq that yields elements from upstream
 // as long as the given predicate returns true. Once the predicate
 // fails, iteration stops permanently.
+//
+// Does not invalidate upstream, only consumes items from it
+// while predicate is satisfied, plus the first item that
+// fails to satisfy the predicate.
 func (seq Seq[T]) TakeWhile(pred func(T) bool) Seq[T] {
 	done := false
-	count := 0
+	var i uint64 = 0
 	return newSeq(func() (T, bool) {
 		if done {
 			var zero T
@@ -301,18 +332,19 @@ func (seq Seq[T]) TakeWhile(pred func(T) bool) Seq[T] {
 		}
 		v, ok := seq.next()
 		if !ok {
+			done = true
+			seq.decRemaining(i)
 			var zero T
 			return zero, false
 		}
-		count++
-		if !pred(v) {
-			if seq.IsExactSized() {
-				*seq.remaining -= uint64(count)
-			}
-			var zero T
-			return zero, false
+		i++
+		if pred(v) {
+			return v, true
 		}
-		return v, true
+		done = true
+		seq.decRemaining(i)
+		var zero T
+		return zero, false
 	}, seq.skip, seq.remaining, seq.maxLen)
 }
 
@@ -334,9 +366,13 @@ func (seq Seq[T]) Skip(n int) Seq[T] {
 	var rem *uint64 = nil
 	maxLen := seq.maxLen
 	if seq.IsExactSized() {
-		r := *seq.remaining - nu64
-		maxLen = r
+		r := *seq.remaining
+		if r <= nu64 {
+			return newTerminated[T]()
+		}
+		r -= nu64
 		rem = &r
+		maxLen = r
 	} else if maxLen > nu64 {
 		maxLen -= nu64
 	}
@@ -367,16 +403,14 @@ func (seq Seq[T]) SkipWhile(pred func(T) bool) Seq[T] {
 	skipped := false
 	return newSeq(func() (T, bool) {
 		if !skipped {
-			i := 0
+			var i uint64 = 0
 			for v, ok := seq.next(); ok; v, ok = seq.next() {
 				if pred(v) {
 					i++
 					continue
 				}
 				skipped = true
-				if seq.IsExactSized() {
-					*seq.remaining -= uint64(i)
-				}
+				seq.decRemaining(i)
 				return v, ok
 			}
 		}
@@ -487,7 +521,7 @@ func (seq Seq[T]) None(pred func(T) bool) bool {
 // Count consumes all items in the sequence and returns their count.
 // Hangs forever on infinite sequences.
 //
-// Invalidation exception: does not consume ExactSized sequences.
+// Does not consume ExactSized sequences.
 //
 // Example:
 //
@@ -509,7 +543,7 @@ func (seq Seq[T]) Count() int {
 // Count consumes all items in the sequence and returns their count.
 // Hangs forever on infinite sequences.
 //
-// Invalidation exception: does not consume ExactSized sequences.
+// Does not consume ExactSized sequences.
 //
 // Example:
 //
@@ -554,12 +588,10 @@ func (seq Seq[T]) ForEach(f func(T)) {
 //	   	return x < 3 // stop once x >= 3, 3 will be printed
 //		})
 func (seq Seq[T]) ForEachUntil(f func(T) bool) {
-	i := 0
+	var i uint64 = 0
 	for v, ok := seq.next(); ok; v, ok = seq.next() {
 		if !f(v) {
-			if seq.IsExactSized() {
-				*seq.remaining -= uint64(i)
-			}
+			seq.decRemaining(i)
 			return
 		}
 		i++
@@ -584,7 +616,7 @@ func (seq Seq[T]) ForEachIndexed(f func(int, T) bool) {
 	for v, ok := seq.next(); ok; v, ok = seq.next() {
 		if !f(i, v) {
 			if seq.IsExactSized() {
-				*seq.remaining -= uint64(i)
+				seq.decRemaining(uint64(i))
 			}
 			return
 		}
@@ -605,11 +637,11 @@ func (s Seq[T]) Slice(start, end int) Seq[T] {
 	return s.Skip(start).Take(end - start)
 }
 
-// Sub takes a subsequence of size end-start items after skipping start items
+// IterSlice takes a slice of size end-start items after skipping start items
 // and returns it as [iter.Seq], so Seq can be iterated with range.
 // If start or end are negative or if end is greater than start, empty sequence
 // is returned.
-func (s Seq[T]) IterRange(start, end int) iter.Seq[T] {
+func (s Seq[T]) IterSlice(start, end int) iter.Seq[T] {
 	return s.Slice(start, end).IterAll()
 }
 

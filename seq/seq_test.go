@@ -126,22 +126,49 @@ func TestTakeWhile(t *testing.T) {
 		pred func(int) bool
 		want []int
 	}{
-		{"empty sequence", []int{},
-			func(x int) bool { return x < 10 }, []int{}},
-		{"all satisfy", []int{1, 2, 3, 4},
-			func(x int) bool { return x < 10 }, []int{1, 2, 3, 4}},
-		{"partial satisfy", []int{1, 2, 3, 10, 11},
-			func(x int) bool { return x < 10 }, []int{1, 2, 3}},
-		{"satisfy with gap", []int{1, 100, 2, 3, 10, 11, 15, 16, 17},
-			func(x int) bool { return x < 10 || x > 15 }, []int{1, 100, 2, 3}},
-		{"none satisfy", []int{10, 11, 12},
-			func(x int) bool { return x < 10 }, []int{}},
+		{"empty sequence", []int{}, func(x int) bool { return x < 10 }, []int{}},
+		{"all satisfy", []int{1, 2, 3, 4}, func(x int) bool { return x < 10 }, []int{1, 2, 3, 4}},
+		{"partial satisfy", []int{1, 2, 3, 10, 11}, func(x int) bool { return x < 10 }, []int{1, 2, 3}},
+		{"satisfy with gap", []int{1, 100, 2, 3, 10, 11, 15, 16, 17}, func(x int) bool { return x < 10 || x > 15 }, []int{1, 100, 2, 3}},
+		{"none satisfy", []int{10, 11, 12}, func(x int) bool { return x < 10 }, []int{}},
 	}
 	for _, tt := range tests {
-		seq := FromSlice(tt.data)
-		got := seq.TakeWhile(tt.pred).ToSlice()
+		seq := FromSlice(tt.data).TakeWhile(tt.pred)
+		got := seq.ToSlice()
 		AssertSliceEq(t, tt.want, got, tt.name)
+		if len(tt.want) > 0 {
+			AssertNotNil(t, seq.remaining)
+			k := len(tt.want) - len(got)
+			if k < 0 {
+				panic("sanity check + remove sec warn")
+			}
+			AssertEq(t, uint64(k), *seq.remaining)
+		}
 	}
+}
+
+func TestTakeWhileUpstream(t *testing.T) {
+	data := []int{1, 100, 2, 3, 10, 11, 15, 16, 17}
+	pred := func(x int) bool { return x < 10 || x > 15 }
+	want := []int{1, 100, 2, 3}
+
+	upstream := FromSlice(data)
+	downstream := upstream.TakeWhile(pred)
+	got := downstream.ToSlice()
+	AssertSliceEq(t, want, got)
+
+	AssertRemainingNilOrZero(t, downstream)
+
+	AssertNotNil(t, upstream.remaining)
+	k := len(want) - len(got)
+	if k < 0 {
+		panic("sanity check + remove sec warn")
+	}
+	AssertEq(t, uint64(k), *upstream.remaining)
+
+	want2 := data[len(want)+1:] // +1 for the first failing item
+	got2 := upstream.ToSlice()
+	AssertSliceEq(t, want2, got2)
 }
 
 func TestSkipNeg(t *testing.T) {
@@ -154,11 +181,24 @@ func TestSkipNeg(t *testing.T) {
 func TestSkipFromSlice(t *testing.T) {
 	want := SliceFromRangeIncl(t, 1, 40)
 	k := len(want) / 2
-	s := FromSlice(want).Skip(k).Take(k)
+	s := FromSlice(want).Skip(k)
+	AssertNotNil(t, s.remaining, "remaining should be not nil after Skip before Next")
+	kk := len(want) - k
+	if kk < 1 {
+		panic("sanity check + remove sec warn")
+	}
+	AssertEq(t, uint64(kk), *s.remaining, "remaining should len(want)-k after Skip before Next")
+	consumeOne, ok := s.Next()
+	AssertEqOk(t, want[k], consumeOne, ok, "sanity check 2")
+	AssertNotNil(t, s.remaining, "remaining should be not nil after Next")
+	AssertEq(t, uint64(kk-1), *s.remaining, "remaining should be len(want)-k-1 after Next")
+	s = s.Take(k)
+	AssertNotNil(t, s.remaining, "remaining should be not nil after Take")
+	AssertEq(t, uint64(kk-1), *s.remaining, "remaining should be len(want)-k-1 after Take")
 	got := s.ToSlice()
-	AssertSliceEq(t, want[k:], got, fmt.Sprintf("Skip(%d)", k))
-	AssertNotNil(t, s.remaining, "seq.remaining should be not nil")
-	AssertEq(t, 0, *s.remaining, "seq.remaining should be zeroed")
+	AssertSliceEq(t, want[k+1:], got, fmt.Sprintf("Skip(%d)", k))
+	AssertNotNil(t, s.remaining, "remaining should be not nil after ToSlice")
+	AssertEq(t, 0, *s.remaining, "remaining should be zeroed after ToSlice")
 }
 
 func TestSkipBiggerThanLenFromSlice(t *testing.T) {
@@ -358,7 +398,7 @@ func TestForEachIndexed(t *testing.T) {
 	AssertSliceEq(t, want[:k+1], got)
 }
 
-func TestIterRange(t *testing.T) {
+func TestIterSlice(t *testing.T) {
 	even := SliceFromRangeIncl(t, 1, 6)
 	odd := even[0 : len(even)-1]
 	tests := []struct {
@@ -393,7 +433,7 @@ func TestIterRange(t *testing.T) {
 			}
 
 			got := make([]int, 0, len(want))
-			for v := range FromSlice(slice).IterRange(start, end) {
+			for v := range FromSlice(slice).IterSlice(start, end) {
 				got = append(got, v)
 			}
 			AssertSliceEq(t, want, got)
@@ -403,7 +443,7 @@ func TestIterRange(t *testing.T) {
 				want := want[:k]
 				got := make([]int, 0, k)
 				i := 0
-				for v := range FromSlice(slice).IterRange(start, end) {
+				for v := range FromSlice(slice).IterSlice(start, end) {
 					got = append(got, v)
 					i++
 					if i == k {

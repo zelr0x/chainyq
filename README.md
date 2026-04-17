@@ -395,19 +395,19 @@ You can also group items into categories using `seq.GroupBy[T, K]`.
 
 See docs for the full list of available operations.
 
-#### Seq Invalidation
+#### Upstream and downstream sequences
 
-Transformations on a sequence (upstream) produce a new sequence (downstream).
-All sequences derived from the same upstream share the same underlying iterator.
-As a result, once a terminal operation is invoked on any sequence, the upstream
-and all of its downstreams are invalidated and must not be used further.
+Transformations on a sequence (upstream) produce a new sequence
+(downstream), which shares the underlying source with the upstream.
+The items consumed from downstream sequences are consumed from upstream
+all sequences unless different behavior is explicitly documented.
 
-All exceptions to those rules are documented explicitly. As an example,
-`Count` and `CountU64` don't consume the upstream if the sequence is `ExactSized`,
-but only if you haven't applied intermediate ops that lose size hints like `Filter`.
 As a rule of thumb: after applying a transformation, do not continue using
 the original sequence unless it is explicitly specified to be safe.
-`IsExactSized` can be used to check if the sequence is `ExactSized`.
+For example, it is safe to use the upstream after [Take] or [Skip] - it will
+contain the remaining items. As another example, [Count] will not consume
+any items at all if exact size of the sequence is known.
+[IsExactSized] can be used to check if exact size of the sequence is known.
 
 ### More complex example
 
