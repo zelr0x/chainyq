@@ -288,6 +288,34 @@ func (seq Seq[T]) Take(n int) Seq[T] {
 	}, seq.skip, rem, nu64)
 }
 
+// TakeWhile returns a new Seq that yields elements from upstream
+// as long as the given predicate returns true. Once the predicate
+// fails, iteration stops permanently.
+func (seq Seq[T]) TakeWhile(pred func(T) bool) Seq[T] {
+	done := false
+	count := 0
+	return newSeq(func() (T, bool) {
+		if done {
+			var zero T
+			return zero, false
+		}
+		v, ok := seq.next()
+		if !ok {
+			var zero T
+			return zero, false
+		}
+		count++
+		if !pred(v) {
+			if seq.IsExactSized() {
+				*seq.remaining -= uint64(count)
+			}
+			var zero T
+			return zero, false
+		}
+		return v, true
+	}, seq.skip, seq.remaining, seq.maxLen)
+}
+
 // Skip discards the first n elements of the sequence,
 // yielding the remainder.
 //

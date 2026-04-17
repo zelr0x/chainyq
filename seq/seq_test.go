@@ -119,6 +119,31 @@ func TestTake(t *testing.T) {
 	}
 }
 
+func TestTakeWhile(t *testing.T) {
+	tests := []struct {
+		name string
+		data []int
+		pred func(int) bool
+		want []int
+	}{
+		{"empty sequence", []int{},
+			func(x int) bool { return x < 10 }, []int{}},
+		{"all satisfy", []int{1, 2, 3, 4},
+			func(x int) bool { return x < 10 }, []int{1, 2, 3, 4}},
+		{"partial satisfy", []int{1, 2, 3, 10, 11},
+			func(x int) bool { return x < 10 }, []int{1, 2, 3}},
+		{"satisfy with gap", []int{1, 100, 2, 3, 10, 11, 15, 16, 17},
+			func(x int) bool { return x < 10 || x > 15 }, []int{1, 100, 2, 3}},
+		{"none satisfy", []int{10, 11, 12},
+			func(x int) bool { return x < 10 }, []int{}},
+	}
+	for _, tt := range tests {
+		seq := FromSlice(tt.data)
+		got := seq.TakeWhile(tt.pred).ToSlice()
+		AssertSliceEq(t, tt.want, got, tt.name)
+	}
+}
+
 func TestSkipNeg(t *testing.T) {
 	want := SliceFromRangeExcl(t, 0, 10)
 	s := FromSlice(want)
