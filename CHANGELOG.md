@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.5] - 2026-04-18
+
+### Added
+- Added `IterAll` (`iter.Seq` range support) for all unidirectional iterators
+
 ## [0.2.4] - 2026-04-17
 
 ### Added
