@@ -1017,29 +1017,50 @@ func TestDocExample1(t *testing.T) {
 func TestIterSeqToSlice(t *testing.T) {
 	slice := SliceFromRangeExcl(t, 0, 33)
 	l := FromSlice(slice)
+
 	got := l.Iter().Seq().ToSlice()
-	AssertSliceEq(t, slice, got)
+	AssertSliceEq(t, slice, got, "from start")
+
+	k := len(slice) / 2
+	got = l.Iter().Skip(k).Seq().ToSlice()
+	AssertSliceEq(t, slice[k:], got, "from mid")
 }
 
 func TestIterPtrSeqToSlice(t *testing.T) {
 	slice := SliceFromRangeExcl(t, 0, 33)
 	l := FromSlice(slice)
+
 	got := l.Iter().PtrSeq().ToSlice()
-	AssertPtrSliceEq(t, slice, got)
+	AssertPtrSliceEq(t, slice, got, "from start")
+
+	k := len(slice) / 2
+	got = l.Iter().Skip(k).PtrSeq().ToSlice()
+	AssertPtrSliceEq(t, slice[k:], got, "from mid")
 }
 
 func TestRevIterSeqToSlice(t *testing.T) {
 	slice := SliceFromRangeExcl(t, 0, 33)
+	rev := ReversedSlice(slice)
 	l := FromSlice(slice)
+
 	got := l.RevIter().Seq().ToSlice()
-	AssertSliceEq(t, ReversedSlice(slice), got)
+	AssertSliceEq(t, rev, got, "from start")
+
+	k := len(rev) / 2
+	got = l.RevIter().Skip(k).Seq().ToSlice()
+	AssertSliceEq(t, rev[k:], got, "from mid")
 }
 
 func TestRevIterPtrSeqToSlice(t *testing.T) {
 	slice := SliceFromRangeExcl(t, 0, 33)
+	rev := ReversedSlice(slice)
 	l := FromSlice(slice)
 	got := l.RevIter().PtrSeq().ToSlice()
-	AssertPtrSliceEq(t, ReversedSlice(slice), got)
+	AssertPtrSliceEq(t, rev, got, "from start")
+
+	k := len(rev) / 2
+	got = l.RevIter().Skip(k).PtrSeq().ToSlice()
+	AssertPtrSliceEq(t, rev[k:], got, "from mid")
 }
 
 // ----- Helpers -----

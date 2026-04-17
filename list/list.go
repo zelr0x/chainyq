@@ -1322,13 +1322,13 @@ func (it *BidiIter[T]) PtrSeq() seq.Seq[*T] {
 
 // RevSeq creates a reverse lazy sequence from this iterator.
 func (it *BidiIter[T]) RevSeq() seq.Seq[T] {
-	rev := it.Clone().ResetBack()
+	rev := it.Clone()
 	return seq.ExactSized(rev.Prev, it.l.len)
 }
 
 // RevPtrSeq creates a reverse lazy sequence from this iterator.
 func (it *BidiIter[T]) RevPtrSeq() seq.Seq[*T] {
-	rev := it.Clone().ResetBack()
+	rev := it.Clone()
 	return seq.ExactSized(rev.PrevPtr, it.l.len)
 }
 
