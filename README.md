@@ -243,6 +243,9 @@ The iterators also take into account the semantics of each data structure:
 - Position reset: `ResetBack`
 - Conversions: `RevSeq`, `RevPtrSeq`
 
+`Iter` and `RevIter` can be converted to `iter.Seq` (`range` syntax)
+using `IterAll` or `IterAllPtr`.
+
 In bidirectional data structures, `Iter` and `RevIter` can be converted to
 the opposite direction with `Rev` and to `BidiIter` with `Bidi`.
 
@@ -356,42 +359,76 @@ func main() {
 from a slice with `seq.FromSlice`, or from a channel with `seq.FromChan`.
 A nil-safe zero value for `Seq` can be created with `seq.Empty[T]()`.
 
+If exact number of items in the source is known, the sequence should be
+created using `seq.ExactSized`. If exact number of items is not known, but
+correct upper bound on size is known, the sequence should be created with
+`seq.Sized`. Those are not just hints but guarantees about size given
+to the `Seq` at construction time. All operations on `Seq` will work
+with those to optimize allocations during collection and other operations.
+
+If the sequence is created from a collection that has a fast way to skip items,
+`WithSkipped` can be called on a newly created sequence to provide fast skip
+implementation. This way `Skip` and `Slice` will use the provided implementation
+directly.
+
 All operations on sequences can be divided into two subcategories:
 - Intermediate - the ones returning `Seq`
 - Terminating - the ones returning any other type.
 
 #### Intermediate operations
 
-`Seq[T]` has a `Next` method just as iterators do.
-It also has `Skip` and `SkipWhile`, which return a new `Seq[T]`,
-starting from the next element after the skipped ones.
-Think of all three as consuming operations: once items are traversed,
-they are no longer part of the sequence.
+- `Next` consumes the next item from the sequence and all upstream sequences.
 
-`Seq[T]` also has transforming and filtering operations: `Seq.Filter[T]`,
-`Seq.Take[T]`, `seq.Map[T, R]`, and `seq.FlatMap[T, R]`.
-The latter two are not methods, but functions in the `seq` package.
+- `Skip` and `SkipWhile` return a new `Seq[T]`, starting from the next element
+after the skipped ones.
+
+- `Take` and `TakeWhile` return a new `Seq[T]` with either `n` first items or
+until the first predicate mismatch respectively.  The upstream sequence
+is consumed only to the point required for `Skip` and `SkipWhile`:
+`upstream.Next()` after `Take(n)` will yield `n+1`th item, and
+after `TakeWhile(pred)` it will yield the item immediately following
+the first item that didn't satisfy the predicate.
+
+- `Slice` provides a safe way to slice the sequence. It returns an empty sequence
+if any of the arguments is invalid.
+
+- `Filter` creates a new sequence that lazily pulls items from upstream
+until it finds the one that satisfies the predicate and returns it. That continues
+until the upstream is fully consumed. Filter loses `ExactSized` and fast skip,
+since they are no longer valid after filtering.
+
+- `seq.Map[T, R]` and `seq.FlatMap[T, R]` work by creating new sequences
+lazily applying the given transformation to them.
+They are not methods, but functions in the `seq` package.
 That is because Go methods currently can't introduce new generic
-parameters - this limits the fluency of the API, but worry not - that
+parameters - this limits the fluency of the API, but that
 will change when generic methods finally arrive.
-For now though, as a rule of thumb - operations that leave the sequence's
+
+As a rule of thumb - operations that leave the sequence's
 element type unchanged are defined as methods on `seq.Seq` and
 operations that transform the element type are functions in the `seq` package.
 
 #### Terminating operations
 
-You can call an arbitrary function on all items in the sequence using
+- Items in the sequence can be tested against predicates using `Find`,
+`Any`, `All`, and `None`.
+
+- Items in the sequence can be counted using `Count` and `CountU64`.
+
+- An arbitrary function can be called on all items in the sequence using
 `ForEach`, `ForEachUntil`, and `ForEachIndexed` - with each having
 finer-grained control than the previous one. These operations are
 used to cause side-effects, they don't produce new sequences and don't
 collect items, unless you explicitly do so inside a closure you pass
 as an argument.
 
-You can collect items using `Seq.ToSlice[T]`, `Seq.ToChan[T]`,
+- Items can be collected using `Seq.ToSlice[T]`, `Seq.ToChan[T]`,
 `seq.ToMap[T, K, V]`, `seq.ToMapMerge[T, K, V]` or some of their versions
 that allow specifying capacity hints.
 
-You can also group items into categories using `seq.GroupBy[T, K]`.
+- Items can be grouped using `seq.GroupBy[T, K]`.
+
+- Sequences can be converted to `iter.Seq` using `IterAll` and `IterSlice`.
 
 See docs for the full list of available operations.
 
@@ -404,10 +441,10 @@ all sequences unless different behavior is explicitly documented.
 
 As a rule of thumb: after applying a transformation, do not continue using
 the original sequence unless it is explicitly specified to be safe.
-For example, it is safe to use the upstream after [Take] or [Skip] - it will
-contain the remaining items. As another example, [Count] will not consume
+For example, it is safe to use the upstream after `Take` or `Skip` - it will
+contain the remaining items. As another example, `Count` will not consume
 any items at all if exact size of the sequence is known.
-[IsExactSized] can be used to check if exact size of the sequence is known.
+`IsExactSized` can be used to check if exact size of the sequence is known.
 
 ### More complex example
 
