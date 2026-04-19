@@ -596,6 +596,8 @@ func (d *Deque[T]) Set(idx int, v T) (T, bool) {
 
 // ReserveFront is the same as Reserve(items, 0), but slightly faster.
 // See [Reserve], [ReserveBack].
+//
+// If the argument is negative, the function returns immediately.
 func (d *Deque[T]) ReserveFront(items int) {
 	if items <= 0 {
 		return
@@ -606,6 +608,8 @@ func (d *Deque[T]) ReserveFront(items int) {
 
 // ReserveBack is the same as Reserve(0, items), but slightly faster.
 // See [Reserve], [ReserveFront].
+//
+// If the argument is negative, the function returns immediately.
 func (d *Deque[T]) ReserveBack(items int) {
 	if items <= 0 {
 		return
@@ -658,6 +662,8 @@ func (d *Deque[T]) Reserve(frontItems, backItems int) {
 //
 // If you want to reserve the space in the deque without eagerly allocating
 // the blocks themselves, use [ReserveFront] or [Reserve] instead.
+//
+// If the argument is negative, the function returns immediately.
 func (d *Deque[T]) EnsureFront(items int) {
 	if items < 1 {
 		return
@@ -688,6 +694,8 @@ func (d *Deque[T]) EnsureFront(items int) {
 //
 // If you want to reserve the space in the deque without eagerly allocating
 // the blocks themselves, use [ReserveBack] or [Reserve] instead.
+//
+// If the argument is negative, the function returns immediately.
 func (d *Deque[T]) EnsureBack(items int) {
 	if items < 1 {
 		return
