@@ -652,8 +652,8 @@ func (it *Iter[T]) TakeWhile(pred func(T) bool) []T {
 }
 
 // TakeWhilePtr collects items to a slice until it encounters the first item that
-// does not match the specified predicate. Returns nil slice as empty.
-// eq is a function that checks if two items are equal.
+// does not match the specified predicate. Returns empty slice if the list
+// is empty.
 func (it *Iter[T]) TakeWhilePtr(pred func(*T) bool) []*T {
 	return it.b.TakeWhilePtr(pred)
 }
@@ -892,8 +892,8 @@ func (it *RevIter[T]) TakeWhile(pred func(T) bool) []T {
 }
 
 // TakeWhilePtr collects items to a slice until it encounters the first item that
-// does not match the specified predicate. Returns nil slice as empty.
-// eq is a function that checks if two items are equal.
+// does not match the specified predicate.  Returns empty slice if the list
+// is empty.
 func (it *RevIter[T]) TakeWhilePtr(pred func(*T) bool) []*T {
 	if !it.HasNext() {
 		return []*T{}
@@ -1252,8 +1252,8 @@ func (it *BidiIter[T]) TakeWhile(pred func(T) bool) []T {
 }
 
 // TakeWhilePtr collects items to a slice until it encounters the first item that
-// does not match the specified predicate. Returns nil slice as empty.
-// eq is a function that checks if two items are equal.
+// does not match the specified predicate. Returns empty slice if the list
+// is empty.
 func (it *BidiIter[T]) TakeWhilePtr(pred func(*T) bool) []*T {
 	if !it.HasNext() {
 		return []*T{}
