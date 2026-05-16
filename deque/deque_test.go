@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/bits"
 	"math/rand"
+	"slices"
 	"testing"
 
 	. "github.com/zelr0x/chainyq/internal/testutil"
@@ -586,9 +587,10 @@ func TestPushBackPopBack(t *testing.T) {
 	for _, v := range slice {
 		d.PushBack(v)
 	}
-	for i := len(slice) - 1; i >= 0; i-- {
+
+	for i, v := range slices.Backward(slice) {
 		got, ok := d.PopBack()
-		AssertEqOk(t, slice[i], got, ok, fmt.Sprintf("PopBack mismatch at i=%d", i))
+		AssertEqOk(t, v, got, ok, fmt.Sprintf("PopBack mismatch at i=%d", i))
 	}
 	AssertEq(t, 0, d.Len())
 }
@@ -599,9 +601,9 @@ func TestPushFrontPopFront(t *testing.T) {
 	for _, v := range slice {
 		d.PushFront(v)
 	}
-	for i := len(slice) - 1; i >= 0; i-- {
+	for i, v := range slices.Backward(slice) {
 		got, ok := d.PopFront()
-		AssertEqOk(t, slice[i], got, ok, fmt.Sprintf("PopFront mismatch at i=%d", i))
+		AssertEqOk(t, v, got, ok, fmt.Sprintf("PopFront mismatch at i=%d", i))
 	}
 	AssertEq(t, 0, d.Len())
 }
